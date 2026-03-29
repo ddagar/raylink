@@ -1,4 +1,4 @@
-import { hostname } from "node:os";
+import { hostname, networkInterfaces } from "node:os";
 import { loadOrCreateCertificate } from "./certificate.js";
 import { DeviceStore } from "./device-store.js";
 import { DiscoveryService } from "./discovery.js";
@@ -8,6 +8,18 @@ import { PairingManager } from "./pairing.js";
 import { WebSocketManager } from "./websocket.js";
 import { ApiServer } from "./server.js";
 import { WEBSOCKET_PORT, DAEMON_PORT, createMessage } from "./protocol.js";
+
+function getLocalIp(): string | undefined {
+  const nets = networkInterfaces();
+  for (const name of Object.keys(nets)) {
+    for (const net of nets[name] || []) {
+      if (net.family === "IPv4" && !net.internal) {
+        return net.address;
+      }
+    }
+  }
+  return undefined;
+}
 
 async function main() {
   console.log("[daemon] Starting RayLink daemon...");
@@ -46,10 +58,13 @@ async function main() {
 
   // 6. Set up clipboard sync: Mac clipboard change → send to all connected devices
   clipboardMonitor.onClipboardChange((content) => {
-    console.log(`[daemon] Mac clipboard changed, broadcasting to devices`);
-    wsManager.broadcast(
-      createMessage("clipboard.update", { content, contentType: "text" })
-    );
+    const deviceCount = wsManager.getConnectedDevices().length;
+    if (deviceCount > 0) {
+      console.log(`[daemon] Mac clipboard changed, sending to ${deviceCount} device(s)`);
+      wsManager.broadcast(
+        createMessage("clipboard.update", { content, contentType: "text" })
+      );
+    }
     clipboardMonitor.addToHistory({
       content,
       contentType: "text",
@@ -79,7 +94,7 @@ async function main() {
     console.log(`[daemon] Accept via API: POST http://127.0.0.1:${DAEMON_PORT}/devices/${pending.deviceId}/pair`);
   });
 
-  // 8. Initialize HTTP API server
+  // 9. Initialize HTTP API server
   const apiServer = new ApiServer(
     deviceStore,
     clipboardMonitor,
@@ -88,17 +103,19 @@ async function main() {
     wsManager
   );
 
-  // 9. Start everything
+  // 10. Start everything
   wsManager.start(WEBSOCKET_PORT);
   apiServer.start(DAEMON_PORT);
   clipboardMonitor.start();
 
-  // 10. Start mDNS discovery
+  // 11. Start mDNS discovery
   const discovery = new DiscoveryService(deviceId);
   discovery.advertise(WEBSOCKET_PORT);
 
+  const localIp = getLocalIp();
   console.log(`[daemon] RayLink daemon started`);
   console.log(`[daemon] Device: ${deviceName} (${deviceId.substring(0, 8)}...)`);
+  console.log(`[daemon] Local IP: ${localIp || "unknown"}`);
   console.log(`[daemon] WebSocket: wss://0.0.0.0:${WEBSOCKET_PORT}`);
   console.log(`[daemon] API: http://127.0.0.1:${DAEMON_PORT}`);
   console.log(`[daemon] mDNS: _raylink._tcp`);
@@ -115,6 +132,14 @@ async function main() {
 
   process.on("SIGINT", shutdown);
   process.on("SIGTERM", shutdown);
+
+  // Prevent crash on unhandled errors
+  process.on("uncaughtException", (err) => {
+    console.error("[daemon] Uncaught exception:", err.message);
+  });
+  process.on("unhandledRejection", (err) => {
+    console.error("[daemon] Unhandled rejection:", err);
+  });
 }
 
 main().catch((err) => {

@@ -1,17 +1,43 @@
-import { List, ActionPanel, Action, Icon, Color, showToast, Toast, confirmAlert } from "@raycast/api";
+import { List, ActionPanel, Action, Icon, Color, showToast, Toast, confirmAlert, Detail } from "@raycast/api";
 import { usePromise } from "@raycast/utils";
 import { getDevices, unpairDevice, getDaemonStatus, getPairingState, pairDevice, rejectPairing } from "./lib/daemon-client";
-import { ensureDaemonRunning } from "./lib/daemon-manager";
+import { ensureDaemonRunning, startDaemon } from "./lib/daemon-manager";
 import { type Device } from "./lib/types";
+
+const SETUP_GUIDE = `
+# RayLink Setup
+
+## 1. Start the Daemon
+The RayLink daemon runs in the background and handles communication with your phone.
+
+\`\`\`bash
+cd daemon && npm run build && node dist/index.js
+\`\`\`
+
+Or install as a Launch Agent for auto-start on login.
+
+## 2. Install RayLink on Android
+Build and install the companion app on your Android phone.
+
+## 3. Connect
+1. Make sure both devices are on the **same WiFi network**
+2. Open RayLink on your phone
+3. Enable the **Accessibility Service** (for clipboard sync)
+4. Tap **Start Connection** — your Mac will appear automatically
+5. Confirm the **6-digit verification code** matches on both devices
+
+## 4. Use
+- **Clipboard** syncs automatically in both directions
+- **Send files** from Mac: select files in Finder, then use the "Send File to Phone" command
+- **Send files** from phone: use the Android share sheet and select RayLink
+`;
 
 export default function Devices() {
   const {
     data: daemonOk,
     isLoading: daemonLoading,
     revalidate: recheckDaemon,
-  } = usePromise(async () => {
-    return ensureDaemonRunning();
-  });
+  } = usePromise(ensureDaemonRunning);
 
   const {
     data: devices,
@@ -42,18 +68,30 @@ export default function Devices() {
 
   if (daemonOk === false) {
     return (
-      <List>
-        <List.EmptyView
-          icon={Icon.ExclamationMark}
-          title="Daemon Not Running"
-          description="The RayLink daemon is not running. Please start it first."
-          actions={
-            <ActionPanel>
-              <Action title="Retry" onAction={recheckDaemon} />
-            </ActionPanel>
-          }
-        />
-      </List>
+      <Detail
+        markdown={SETUP_GUIDE}
+        actions={
+          <ActionPanel>
+            <Action
+              title="Start Daemon"
+              icon={Icon.Play}
+              onAction={async () => {
+                const toast = await showToast(Toast.Style.Animated, "Starting daemon...");
+                try {
+                  await startDaemon();
+                  toast.style = Toast.Style.Success;
+                  toast.title = "Daemon started";
+                  recheckDaemon();
+                } catch {
+                  toast.style = Toast.Style.Failure;
+                  toast.title = "Failed to start daemon";
+                }
+              }}
+            />
+            <Action title="Retry Connection" icon={Icon.ArrowClockwise} onAction={recheckDaemon} />
+          </ActionPanel>
+        }
+      />
     );
   }
 
@@ -62,12 +100,12 @@ export default function Devices() {
   return (
     <List isLoading={isLoading} searchBarPlaceholder="Search devices...">
       {hasPendingPairing && pairingState.pending && (
-        <List.Section title="Pairing Request">
+        <List.Section title="Incoming Pairing Request">
           <List.Item
             icon={{ source: Icon.Link, tintColor: Color.Orange }}
             title={pairingState.pending.deviceName}
-            subtitle={`Verification code: ${pairingState.pending.verificationCode}`}
-            accessories={[{ text: "Confirm code matches on both devices" }]}
+            subtitle={`Code: ${pairingState.pending.verificationCode}`}
+            accessories={[{ text: "Verify this code matches your phone" }]}
             actions={
               <ActionPanel>
                 <Action
@@ -121,10 +159,12 @@ export default function Devices() {
               ]}
               actions={
                 <ActionPanel>
+                  <Action title="Refresh" icon={Icon.ArrowClockwise} onAction={reloadDevices} />
                   <Action
                     title="Unpair Device"
                     icon={Icon.Trash}
                     style={Action.Style.Destructive}
+                    shortcut={{ modifiers: ["ctrl"], key: "x" }}
                     onAction={async () => {
                       if (
                         await confirmAlert({
@@ -138,16 +178,20 @@ export default function Devices() {
                       }
                     }}
                   />
-                  <Action title="Refresh" icon={Icon.ArrowClockwise} onAction={reloadDevices} />
                 </ActionPanel>
               }
             />
           ))
         ) : (
           <List.Item
-            icon={Icon.Info}
+            icon={Icon.Mobile}
             title="No paired devices"
-            subtitle="Open the RayLink app on your Android phone to pair"
+            subtitle="Open RayLink on your Android phone to pair"
+            actions={
+              <ActionPanel>
+                <Action title="Refresh" icon={Icon.ArrowClockwise} onAction={reloadDevices} />
+              </ActionPanel>
+            }
           />
         )}
       </List.Section>
