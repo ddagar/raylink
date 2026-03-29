@@ -24,6 +24,7 @@ class ConnectionService : Service() {
     private lateinit var certManager: CertificateManager
 
     private var connectedDeviceName: String? = null
+    private var connectedDeviceId: String? = null
     private var isPaired = false
 
     // Suppress echo: when we receive clipboard from Mac, don't send it back.
@@ -65,7 +66,9 @@ class ConnectionService : Service() {
             val deviceId = certManager.getOrCreateDeviceId()
             val deviceName = Build.MODEL
 
-            // Send pair request
+            // Always send pair.request — the Mac will auto-accept if already paired.
+            // This is simpler than tracking pairing state across reconnects,
+            // and the Mac handles it efficiently (immediate accept, no user prompt).
             wsClient.sendPairRequest(
                 deviceName = deviceName,
                 deviceId = deviceId,
@@ -75,6 +78,7 @@ class ConnectionService : Service() {
 
         wsClient.onDisconnected = {
             connectedDeviceName = null
+            connectedDeviceId = null
             isPaired = false
             updateNotification("Disconnected — searching...")
         }
@@ -112,7 +116,9 @@ class ConnectionService : Service() {
             MessageType.PAIR_ACCEPT -> {
                 val deviceName = message.bodyString("deviceName") ?: "Mac"
                 val deviceId = message.bodyString("deviceId") ?: ""
+                val wasAlreadyPaired = certManager.isTrustedDevice(deviceId)
                 connectedDeviceName = deviceName
+                connectedDeviceId = deviceId
                 isPaired = true
 
                 // Save trusted device
@@ -121,8 +127,13 @@ class ConnectionService : Service() {
                     certManager.saveTrustedDevice(deviceId, cert)
                 }
 
-                updateNotification("Connected to $deviceName")
-                Log.d(TAG, "Paired with $deviceName ($deviceId)")
+                if (wasAlreadyPaired) {
+                    updateNotification("Reconnected to $deviceName")
+                    Log.d(TAG, "Reconnected to $deviceName ($deviceId)")
+                } else {
+                    updateNotification("Connected to $deviceName")
+                    Log.d(TAG, "Paired with $deviceName ($deviceId)")
+                }
 
                 // Send current clipboard to Mac on connection
                 sendClipboardConnect()

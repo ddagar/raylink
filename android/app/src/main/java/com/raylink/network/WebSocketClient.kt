@@ -128,7 +128,13 @@ class RayLinkWebSocketClient(
         }
         webSocket?.close(1000, "Client disconnect")
         webSocket = null
-        client?.dispatcher?.executorService?.shutdown()
+        try {
+            client?.dispatcher?.executorService?.shutdown()
+            client?.dispatcher?.executorService?.awaitTermination(3, TimeUnit.SECONDS)
+        } catch (e: InterruptedException) {
+            Log.w(TAG, "Interrupted while awaiting executor shutdown")
+            Thread.currentThread().interrupt()
+        }
         client = null
     }
 

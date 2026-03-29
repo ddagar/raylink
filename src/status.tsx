@@ -1,14 +1,16 @@
-import { MenuBarExtra, Icon, Clipboard, showHUD, launchCommand, LaunchType, Cache } from "@raycast/api";
+import { MenuBarExtra, Icon, Clipboard, showHUD, launchCommand, LaunchType, Cache, environment } from "@raycast/api";
 import { usePromise } from "@raycast/utils";
-import { getDaemonStatus, getDevices, getClipboardHistory, getLatestClipboardFromPhone, sendClipboard } from "./lib/daemon-client";
+import { getDaemonStatus, getDevices, getClipboardHistory, sendClipboard } from "./lib/daemon-client";
 import { getPreferences } from "./lib/preferences";
 import { type Device, type ClipboardEntry } from "./lib/types";
+import { useEffect } from "react";
 
 const cache = new Cache();
 const LAST_SYNC_KEY = "lastSyncTimestamp";
 
 export default function Status() {
   const prefs = getPreferences();
+  const isBackground = environment.launchType === LaunchType.Background;
 
   const { data: status } = usePromise(async () => {
     try {
@@ -28,29 +30,36 @@ export default function Status() {
 
   const { data: history } = usePromise(async () => {
     try {
-      const entries = await getClipboardHistory();
-
-      // Auto-sync: check if there's a new clipboard from the phone
-      if (prefs.autoSync && entries.length > 0) {
-        const latest = entries.find((e) => e.source === "android");
-        if (latest) {
-          const lastSync = parseInt(cache.get(LAST_SYNC_KEY) || "0", 10);
-          if (latest.timestamp > lastSync) {
-            // New clipboard from phone — auto-copy to Mac
-            await Clipboard.copy(latest.content);
-            cache.set(LAST_SYNC_KEY, String(latest.timestamp));
-            if (prefs.showNotifications) {
-              await showHUD(`Clipboard from ${latest.deviceName || "phone"}`);
-            }
-          }
-        }
-      }
-
-      return entries;
+      return await getClipboardHistory();
     } catch {
       return [] as ClipboardEntry[];
     }
   });
+
+  // Auto-sync: run as a side-effect after history is fetched.
+  // This runs on every mount (including background interval refreshes).
+  useEffect(() => {
+    if (!prefs.autoSync || !history || history.length === 0) return;
+
+    const latest = history.find((e) => e.source === "android");
+    if (!latest) return;
+
+    const lastSync = parseInt(cache.get(LAST_SYNC_KEY) || "0", 10);
+    if (latest.timestamp <= lastSync) return;
+
+    // New clipboard from phone — auto-copy to Mac
+    (async () => {
+      try {
+        await Clipboard.copy(latest.content);
+        cache.set(LAST_SYNC_KEY, String(latest.timestamp));
+        if (prefs.showNotifications && !isBackground) {
+          await showHUD(`Clipboard from ${latest.deviceName || "phone"}`);
+        }
+      } catch {
+        // Silently fail — will retry on next interval
+      }
+    })();
+  }, [history]);
 
   const isRunning = !!status?.running;
   const connectedDevices = devices?.filter((d) => d.connected) || [];
