@@ -300,6 +300,38 @@ GET  /transfers                     → all file transfers
 GET  /transfers/:id                 → single transfer status
 ```
 
+## Resource Usage
+
+Measured on MacBook Pro + Samsung Galaxy Z Fold 5 with one device connected, idle.
+
+### Mac Daemon (Node.js)
+
+| Metric | Value |
+|--------|-------|
+| Memory (RSS) | ~77 MB |
+| CPU (idle) | 0.1% |
+| Network (idle) | ~12 KB/s in, ~8 KB/s out |
+| Open sockets | 3 (WSS, phone, HTTP API) |
+| Disk (daemon + deps) | 43 MB |
+
+### Android App
+
+| Metric | Value |
+|--------|-------|
+| APK size | 25 MB |
+| Memory (PSS) | ~64 MB |
+| Battery (wifi) | 0.08 mAh |
+| Battery (CPU, background) | ~6 mAh |
+
+### Raycast Extension
+
+| Metric | Value |
+|--------|-------|
+| Source code | 52 KB |
+| Menu bar polling | 3 HTTP calls every 10s |
+
+The extension is lightweight. The daemon uses less CPU than a typical browser tab. The Android app uses less memory than Telegram. Clipboard polling (500ms on Mac, 1s on Android) is the main ongoing cost but negligible for CPU and battery.
+
 ## Known Limitations
 
 - **Local network only** — no cloud relay for cross-network use
