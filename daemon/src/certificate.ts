@@ -3,6 +3,7 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
+import { homedir } from "node:os";
 
 export interface CertificateInfo {
   cert: string; // PEM
@@ -13,7 +14,7 @@ export interface CertificateInfo {
 const CERT_VALIDITY_YEARS = 10;
 
 function getDataDir(): string {
-  return join(process.env.HOME || "~", ".raycast-android");
+  return join(homedir(), ".raycast-android");
 }
 
 export function getCertPath(): string {

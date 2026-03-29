@@ -88,7 +88,15 @@ export class WebSocketManager {
         this.handleMessage(ws, device, msg);
       });
 
+      // Send ping every 30s to keep connection alive
+      const pingInterval = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(serializeMessage(createMessage("ping")));
+        }
+      }, 30_000);
+
       ws.on("close", () => {
+        clearInterval(pingInterval);
         const dev = this.connections.get(ws);
         if (dev?.id) {
           console.log(`[ws] Device disconnected: ${dev.name} (${dev.id})`);
@@ -98,17 +106,17 @@ export class WebSocketManager {
       });
 
       ws.on("error", (err) => {
+        clearInterval(pingInterval);
         console.error("[ws] Connection error:", err.message);
       });
+    });
 
-      // Send ping every 30s
-      const pingInterval = setInterval(() => {
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(serializeMessage(createMessage("ping")));
-        } else {
-          clearInterval(pingInterval);
-        }
-      }, 30_000);
+    this.httpsServer.on("error", (err: NodeJS.ErrnoException) => {
+      if (err.code === "EADDRINUSE") {
+        console.error(`[ws] Port ${port} is already in use. Is another daemon running?`);
+      } else {
+        console.error(`[ws] Server error: ${err.message}`);
+      }
     });
 
     this.httpsServer.listen(port, () => {

@@ -67,7 +67,7 @@ export default function Status() {
         // Silently fail — will retry on next interval
       }
     })();
-  }, [history]);
+  }, [history, prefs.autoSync, prefs.showNotifications, isBackground]);
 
   const isRunning = !!status?.running;
   const connectedDevices = devices?.filter((d) => d.connected) || [];

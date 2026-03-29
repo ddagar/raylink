@@ -259,6 +259,13 @@ export class ApiServer {
     this.server = this.app.listen(port, "127.0.0.1", () => {
       console.log(`[api] HTTP API listening on http://127.0.0.1:${port}`);
     });
+    this.server.on("error", (err: NodeJS.ErrnoException) => {
+      if (err.code === "EADDRINUSE") {
+        console.error(`[api] Port ${port} is already in use. Is another daemon running?`);
+      } else {
+        console.error(`[api] Server error: ${err.message}`);
+      }
+    });
   }
 
   stop(): void {

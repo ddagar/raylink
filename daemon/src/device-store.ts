@@ -1,6 +1,7 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { homedir } from "node:os";
 
 export interface StoredDevice {
   id: string;
@@ -16,7 +17,7 @@ interface DeviceStoreData {
 }
 
 function getStorePath(): string {
-  return join(process.env.HOME || "~", ".raycast-android", "devices.json");
+  return join(homedir(), ".raycast-android", "devices.json");
 }
 
 export class DeviceStore {
@@ -42,7 +43,7 @@ export class DeviceStore {
   }
 
   async save(): Promise<void> {
-    const dir = join(process.env.HOME || "~", ".raycast-android");
+    const dir = join(homedir(), ".raycast-android");
     if (!existsSync(dir)) {
       await mkdir(dir, { recursive: true });
     }

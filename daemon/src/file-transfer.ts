@@ -3,6 +3,7 @@ import { writeFile, mkdir, stat } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join, basename } from "node:path";
 import { randomUUID } from "node:crypto";
+import { homedir } from "node:os";
 import { createMessage, FILE_CHUNK_SIZE, type Message } from "./protocol.js";
 
 export type TransferDirection = "incoming" | "outgoing";
@@ -33,7 +34,7 @@ export class FileTransferManager {
   private onTransferComplete: ((transfer: FileTransfer) => void) | null = null;
 
   constructor(downloadDir?: string) {
-    this.downloadDir = downloadDir || join(process.env.HOME || "~", "Downloads");
+    this.downloadDir = downloadDir || join(homedir(), "Downloads");
   }
 
   setMessageSender(sender: (msg: Message) => void): void {
