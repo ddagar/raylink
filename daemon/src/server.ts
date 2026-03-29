@@ -1,7 +1,7 @@
 import express from "express";
 import { type Server } from "node:http";
 import { readFile } from "node:fs/promises";
-import { DAEMON_PORT, createMessage } from "./protocol.js";
+import { DAEMON_PORT, createMessage, type Message } from "./protocol.js";
 import { DeviceStore } from "./device-store.js";
 import { ClipboardMonitor } from "./clipboard.js";
 import { FileTransferManager } from "./file-transfer.js";
@@ -221,12 +221,12 @@ export class ApiServer {
       }
 
       try {
-        // Set up message sender to target the specific device
-        this.fileTransferManager.setMessageSender((msg) => {
+        // Per-transfer sender targeting the specific device
+        const sender = (msg: Message) => {
           this.wsManager.sendToDevice(req.params.id, msg);
-        });
+        };
 
-        const transfer = await this.fileTransferManager.initiateTransfer(filePath);
+        const transfer = await this.fileTransferManager.initiateTransfer(filePath, sender);
         res.json({ success: true, transferId: transfer.id });
       } catch (err) {
         res.status(500).json({ error: `Failed to send file: ${err}` });
@@ -236,6 +236,16 @@ export class ApiServer {
     // List transfers
     this.app.get("/transfers", (_req, res) => {
       res.json(this.fileTransferManager.getAllTransfers());
+    });
+
+    // Get single transfer status
+    this.app.get("/transfers/:id", (req, res) => {
+      const transfer = this.fileTransferManager.getTransfer(req.params.id);
+      if (transfer) {
+        res.json(transfer);
+      } else {
+        res.status(404).json({ error: "Transfer not found" });
+      }
     });
   }
 

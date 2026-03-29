@@ -1,8 +1,8 @@
 import { MenuBarExtra, Icon, Clipboard, showHUD, launchCommand, LaunchType, Cache, environment } from "@raycast/api";
 import { usePromise } from "@raycast/utils";
-import { getDaemonStatus, getDevices, getClipboardHistory, sendClipboard } from "./lib/daemon-client";
+import { getDaemonStatus, getDevices, getClipboardHistory, getTransfers, sendClipboard } from "./lib/daemon-client";
 import { getPreferences } from "./lib/preferences";
-import { type Device, type ClipboardEntry } from "./lib/types";
+import { type Device, type ClipboardEntry, type FileTransfer } from "./lib/types";
 import { useEffect } from "react";
 
 const cache = new Cache();
@@ -33,6 +33,14 @@ export default function Status() {
       return await getClipboardHistory();
     } catch {
       return [] as ClipboardEntry[];
+    }
+  });
+
+  const { data: transfers } = usePromise(async () => {
+    try {
+      return await getTransfers();
+    } catch {
+      return [] as FileTransfer[];
     }
   });
 
@@ -121,6 +129,30 @@ export default function Status() {
                   launchCommand({ name: "clipboard-history", type: LaunchType.UserInitiated })
                 }
               />
+            </MenuBarExtra.Section>
+          )}
+
+          {transfers && transfers.length > 0 && (
+            <MenuBarExtra.Section title="Recent Transfers">
+              {transfers.slice(0, 3).map((t) => {
+                const icon = t.status === "completed"
+                  ? Icon.CheckCircle
+                  : t.status === "in_progress"
+                    ? Icon.Clock
+                    : t.status === "failed"
+                      ? Icon.XMarkCircle
+                      : Icon.Document;
+                const arrow = t.direction === "incoming" ? "v " : "^ ";
+                const progress = t.status === "in_progress" ? ` ${t.progress}%` : "";
+                return (
+                  <MenuBarExtra.Item
+                    key={`xfer-${t.id}`}
+                    title={`${arrow}${t.fileName}${progress}`}
+                    icon={icon}
+                    tooltip={`${t.direction === "incoming" ? "From phone" : "To phone"} - ${t.status}`}
+                  />
+                );
+              })}
             </MenuBarExtra.Section>
           )}
 

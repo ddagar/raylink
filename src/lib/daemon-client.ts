@@ -93,3 +93,7 @@ export async function sendFile(deviceId: string, filePath: string): Promise<{ su
 export async function getTransfers(): Promise<FileTransfer[]> {
   return request<FileTransfer[]>("/transfers");
 }
+
+export async function getTransferStatus(transferId: string): Promise<FileTransfer> {
+  return request<FileTransfer>(`/transfers/${transferId}`);
+}

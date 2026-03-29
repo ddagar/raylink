@@ -266,9 +266,7 @@ export class WebSocketManager {
           mimeType: string;
           transferId: string;
         };
-        // Per-connection sender for this file transfer
-        this.fileTransferManager.setMessageSender(sendToThis);
-        this.fileTransferManager.handleFileOffer(body);
+        this.fileTransferManager.handleFileOffer(body, sendToThis);
         console.log(`[ws] Incoming file: ${body.fileName} (${body.fileSize} bytes)`);
         break;
       }
@@ -276,7 +274,6 @@ export class WebSocketManager {
       case "file.accept": {
         if (!device.paired) return;
         const body = msg.body as { transferId: string };
-        this.fileTransferManager.setMessageSender(sendToThis);
         this.fileTransferManager.handleFileAccept(body.transferId);
         break;
       }

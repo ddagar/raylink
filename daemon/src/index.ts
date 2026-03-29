@@ -58,7 +58,13 @@ async function main() {
     });
   });
 
-  // 7. Set up event logging
+  // 7. Set up file transfer completion logging
+  fileTransferManager.setOnTransferComplete((transfer) => {
+    const dir = transfer.direction === "incoming" ? "received" : "sent";
+    console.log(`[daemon] File ${dir}: ${transfer.fileName} (${transfer.localPath || ""})`);
+  });
+
+  // 8. Set up event logging
   wsManager.setOnDeviceConnected((device) => {
     console.log(`[daemon] Device connected: ${device.name} (${device.id})`);
   });
