@@ -119,6 +119,18 @@ class ConnectionService : Service() {
         }
     }
 
+    private fun startDiscovery() {
+        discovery.onServiceFound = { service ->
+            Log.d(TAG, "Found Mac: ${service.deviceName} at ${service.host}:${service.port}")
+            if (!wsClient.isConnected()) {
+                wsClient.connect(service.host, service.port)
+                updateNotification("Connecting to ${service.deviceName ?: service.host}...")
+            }
+        }
+
+        discovery.startDiscovery()
+    }
+
     private fun handleMessage(message: Message) {
         when (message.type) {
             MessageType.PAIR_ACCEPT -> {

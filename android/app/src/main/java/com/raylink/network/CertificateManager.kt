@@ -2,22 +2,15 @@ package com.raylink.network
 
 import android.content.Context
 import java.io.File
-import java.security.KeyPairGenerator
-import java.security.KeyStore
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
-import java.util.Date
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
-import org.bouncycastle.x509.X509V3CertificateGenerator
-import javax.security.auth.x500.X500Principal
 
 class CertificateManager(private val context: Context) {
 
-    private val certFile get() = File(context.filesDir, "device_cert.pem")
-    private val keyFile get() = File(context.filesDir, "device_key.pem")
     private val trustedDir get() = File(context.filesDir, "trusted_certs").also { it.mkdirs() }
 
     fun getOrCreateDeviceId(): String {
