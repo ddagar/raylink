@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">RayLink</string>
+    <string name="accessibility_description">RayLink needs accessibility access to monitor clipboard changes and sync them with your Mac.</string>
+    <string name="notification_channel_name">Connection Status</string>
+    <string name="notification_channel_description">Shows when RayLink is connected to your Mac</string>
+</resources>

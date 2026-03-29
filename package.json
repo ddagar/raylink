@@ -1,0 +1,104 @@
+{
+  "$schema": "https://www.raycast.com/schemas/extension.json",
+  "name": "raycast-android",
+  "title": "Android Link",
+  "description": "Clipboard sync and file transfer between your Mac and Android phone",
+  "icon": "icon.png",
+  "author": "ddagar",
+  "categories": ["Productivity", "System"],
+  "license": "MIT",
+  "preferences": [
+    {
+      "name": "downloadDirectory",
+      "type": "directory",
+      "title": "Download Directory",
+      "description": "Where to save files received from your phone",
+      "required": false,
+      "default": "~/Downloads"
+    },
+    {
+      "name": "autoSync",
+      "type": "checkbox",
+      "title": "Auto Sync Clipboard",
+      "description": "Automatically sync clipboard between devices in the background",
+      "required": false,
+      "default": true,
+      "label": "Enable automatic clipboard sync"
+    },
+    {
+      "name": "showNotifications",
+      "type": "checkbox",
+      "title": "Show Notifications",
+      "description": "Show HUD notifications when clipboard is synced",
+      "required": false,
+      "default": true,
+      "label": "Show sync notifications"
+    }
+  ],
+  "commands": [
+    {
+      "name": "devices",
+      "title": "Devices",
+      "subtitle": "Android Link",
+      "description": "View and manage connected Android devices",
+      "mode": "view"
+    },
+    {
+      "name": "send-clipboard",
+      "title": "Send Clipboard to Phone",
+      "subtitle": "Android Link",
+      "description": "Send your Mac clipboard content to your Android phone",
+      "mode": "no-view"
+    },
+    {
+      "name": "pull-clipboard",
+      "title": "Pull Clipboard from Phone",
+      "subtitle": "Android Link",
+      "description": "Get clipboard content from your Android phone",
+      "mode": "no-view"
+    },
+    {
+      "name": "send-file",
+      "title": "Send File to Phone",
+      "subtitle": "Android Link",
+      "description": "Send a file to your Android phone",
+      "mode": "no-view"
+    },
+    {
+      "name": "clipboard-history",
+      "title": "Clipboard History",
+      "subtitle": "Android Link",
+      "description": "View synced clipboard history between devices",
+      "mode": "view"
+    },
+    {
+      "name": "status",
+      "title": "Android Link Status",
+      "subtitle": "Android Link",
+      "description": "Menu bar status for Android Link",
+      "mode": "menu-bar",
+      "interval": "10s"
+    }
+  ],
+  "dependencies": {
+    "@raycast/api": "^1.93.3",
+    "@raycast/utils": "^1.19.1",
+    "node-fetch": "^3.3.2"
+  },
+  "devDependencies": {
+    "@raycast/eslint-config": "^1.0.11",
+    "@types/node": "22.14.0",
+    "@types/react": "19.0.10",
+    "eslint": "^8.57.0",
+    "prettier": "^3.5.3",
+    "typescript": "^5.8.2",
+    "react": "^19.0.0"
+  },
+  "scripts": {
+    "build": "ray build",
+    "dev": "ray develop",
+    "fix-lint": "ray lint --fix",
+    "lint": "ray lint",
+    "publish": "npx @raycast/api@latest publish"
+  }
+}
