@@ -78,7 +78,12 @@ export interface Device {
 // === Transfer Types ===
 
 export type TransferDirection = "incoming" | "outgoing";
-export type TransferStatus = "pending" | "in_progress" | "completed" | "failed" | "rejected";
+export type TransferStatus =
+  | "pending"
+  | "in_progress"
+  | "completed"
+  | "failed"
+  | "rejected";
 
 export interface FileTransfer {
   id: string;
@@ -115,7 +120,13 @@ export interface DaemonStatus {
 }
 
 export interface DaemonEvent {
-  type: "clipboard.received" | "device.connected" | "device.disconnected" | "transfer.progress" | "transfer.complete" | "pair.incoming";
+  type:
+    | "clipboard.received"
+    | "device.connected"
+    | "device.disconnected"
+    | "transfer.progress"
+    | "transfer.complete"
+    | "pair.incoming";
   data: Record<string, unknown>;
   timestamp: number;
 }

@@ -6,7 +6,11 @@ export default async function PullClipboard() {
   try {
     const running = await ensureDaemonRunning();
     if (!running) {
-      await showToast(Toast.Style.Failure, "Daemon not running", "Start the RayLink daemon first");
+      await showToast(
+        Toast.Style.Failure,
+        "Daemon not running",
+        "Start the RayLink daemon first",
+      );
       return;
     }
 
@@ -29,7 +33,7 @@ export default async function PullClipboard() {
     await showToast(
       Toast.Style.Failure,
       "Failed to pull clipboard",
-      error instanceof Error ? error.message : String(error)
+      error instanceof Error ? error.message : String(error),
     );
   }
 }

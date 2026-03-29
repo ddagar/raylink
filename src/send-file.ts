@@ -1,4 +1,9 @@
-import { showHUD, showToast, Toast, getSelectedFinderItems } from "@raycast/api";
+import {
+  showHUD,
+  showToast,
+  Toast,
+  getSelectedFinderItems,
+} from "@raycast/api";
 import { getDevices, sendFile, getTransferStatus } from "./lib/daemon-client";
 import { ensureDaemonRunning } from "./lib/daemon-manager";
 
@@ -6,7 +11,11 @@ export default async function SendFile() {
   try {
     const running = await ensureDaemonRunning();
     if (!running) {
-      await showToast(Toast.Style.Failure, "Daemon not running", "Start the RayLink daemon first");
+      await showToast(
+        Toast.Style.Failure,
+        "Daemon not running",
+        "Start the RayLink daemon first",
+      );
       return;
     }
 
@@ -16,7 +25,11 @@ export default async function SendFile() {
       const items = await getSelectedFinderItems();
       filePaths = items.map((item) => item.path);
     } catch {
-      await showToast(Toast.Style.Failure, "No files selected", "Select files in Finder first");
+      await showToast(
+        Toast.Style.Failure,
+        "No files selected",
+        "Select files in Finder first",
+      );
       return;
     }
 
@@ -30,7 +43,11 @@ export default async function SendFile() {
     const connected = devices.find((d) => d.connected);
 
     if (!connected) {
-      await showToast(Toast.Style.Failure, "No device connected", "Pair and connect your phone first");
+      await showToast(
+        Toast.Style.Failure,
+        "No device connected",
+        "Pair and connect your phone first",
+      );
       return;
     }
 
@@ -44,14 +61,16 @@ export default async function SendFile() {
     const fileCount = filePaths.length;
     const toast = await showToast({
       style: Toast.Style.Animated,
-      title: fileCount === 1
-        ? `Sending file to ${connected.name}...`
-        : `Sending ${fileCount} files to ${connected.name}...`,
+      title:
+        fileCount === 1
+          ? `Sending file to ${connected.name}...`
+          : `Sending ${fileCount} files to ${connected.name}...`,
     });
 
     // Poll for completion
     const pollCompletion = async () => {
-      for (let i = 0; i < 120; i++) { // Max 2 minutes
+      for (let i = 0; i < 120; i++) {
+        // Max 2 minutes
         await new Promise((r) => setTimeout(r, 1000));
 
         let allDone = true;
@@ -76,9 +95,10 @@ export default async function SendFile() {
             toast.title = "Some files failed to send";
           } else {
             toast.style = Toast.Style.Success;
-            toast.title = fileCount === 1
-              ? `File sent to ${connected.name}`
-              : `${fileCount} files sent to ${connected.name}`;
+            toast.title =
+              fileCount === 1
+                ? `File sent to ${connected.name}`
+                : `${fileCount} files sent to ${connected.name}`;
           }
           return;
         }
@@ -93,7 +113,7 @@ export default async function SendFile() {
     await showToast(
       Toast.Style.Failure,
       "Failed to send file",
-      error instanceof Error ? error.message : String(error)
+      error instanceof Error ? error.message : String(error),
     );
   }
 }

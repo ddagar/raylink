@@ -1,4 +1,11 @@
-import { DAEMON_HOST, DAEMON_PORT, type DaemonStatus, type Device, type ClipboardEntry, type FileTransfer } from "./types";
+import {
+  DAEMON_HOST,
+  DAEMON_PORT,
+  type DaemonStatus,
+  type Device,
+  type ClipboardEntry,
+  type FileTransfer,
+} from "./types";
 
 const BASE_URL = `http://${DAEMON_HOST}:${DAEMON_PORT}`;
 
@@ -36,11 +43,15 @@ export async function getDevices(): Promise<Device[]> {
   return request<Device[]>("/devices");
 }
 
-export async function pairDevice(deviceId: string): Promise<{ success: boolean; verificationCode?: string }> {
+export async function pairDevice(
+  deviceId: string,
+): Promise<{ success: boolean; verificationCode?: string }> {
   return request(`/devices/${deviceId}/pair`, { method: "POST" });
 }
 
-export async function unpairDevice(deviceId: string): Promise<{ success: boolean }> {
+export async function unpairDevice(
+  deviceId: string,
+): Promise<{ success: boolean }> {
   return request(`/devices/${deviceId}/unpair`, { method: "POST" });
 }
 
@@ -60,7 +71,9 @@ export async function rejectPairing(): Promise<{ success: boolean }> {
   return request("/pairing/reject", { method: "POST" });
 }
 
-export async function sendClipboard(content?: string): Promise<{ success: boolean }> {
+export async function sendClipboard(
+  content?: string,
+): Promise<{ success: boolean }> {
   return request("/clipboard/send", {
     method: "POST",
     body: JSON.stringify(content ? { content } : {}),
@@ -79,11 +92,16 @@ export async function getLatestClipboardFromPhone(): Promise<ClipboardEntry | nu
   return request<ClipboardEntry | null>("/clipboard/latest");
 }
 
-export async function getLatestDeviceClipboard(deviceId: string): Promise<ClipboardEntry> {
+export async function getLatestDeviceClipboard(
+  deviceId: string,
+): Promise<ClipboardEntry> {
   return request<ClipboardEntry>(`/devices/${deviceId}/clipboard/latest`);
 }
 
-export async function sendFile(deviceId: string, filePath: string): Promise<{ success: boolean; transferId: string }> {
+export async function sendFile(
+  deviceId: string,
+  filePath: string,
+): Promise<{ success: boolean; transferId: string }> {
   return request(`/devices/${deviceId}/file/send`, {
     method: "POST",
     body: JSON.stringify({ filePath }),
@@ -94,6 +112,8 @@ export async function getTransfers(): Promise<FileTransfer[]> {
   return request<FileTransfer[]>("/transfers");
 }
 
-export async function getTransferStatus(transferId: string): Promise<FileTransfer> {
+export async function getTransferStatus(
+  transferId: string,
+): Promise<FileTransfer> {
   return request<FileTransfer>(`/transfers/${transferId}`);
 }

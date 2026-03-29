@@ -1,4 +1,12 @@
-import { List, ActionPanel, Action, Icon, Color, showToast, Toast } from "@raycast/api";
+import {
+  List,
+  ActionPanel,
+  Action,
+  Icon,
+  Color,
+  showToast,
+  Toast,
+} from "@raycast/api";
 import { usePromise } from "@raycast/utils";
 import { getClipboardHistory, sendClipboard } from "./lib/daemon-client";
 import { ensureDaemonRunning } from "./lib/daemon-manager";
@@ -17,17 +25,18 @@ export default function ClipboardHistory() {
       return getClipboardHistory();
     },
     [],
-    { execute: daemonOk === true }
+    { execute: daemonOk === true },
   );
 
   return (
-    <List isLoading={isLoading} searchBarPlaceholder="Search clipboard history...">
+    <List
+      isLoading={isLoading}
+      searchBarPlaceholder="Search clipboard history..."
+    >
       {history && history.length > 0 ? (
         history.map((entry: ClipboardEntry, index: number) => {
           const isFromPhone = entry.source === "android";
-          const sourceLabel = isFromPhone
-            ? entry.deviceName || "Phone"
-            : "Mac";
+          const sourceLabel = isFromPhone ? entry.deviceName || "Phone" : "Mac";
           const timeStr = new Date(entry.timestamp).toLocaleTimeString();
 
           return (
@@ -37,7 +46,11 @@ export default function ClipboardHistory() {
                 source: isFromPhone ? Icon.Mobile : Icon.Monitor,
                 tintColor: isFromPhone ? Color.Blue : Color.Green,
               }}
-              title={entry.content.length > 100 ? entry.content.substring(0, 100) + "..." : entry.content}
+              title={
+                entry.content.length > 100
+                  ? entry.content.substring(0, 100) + "..."
+                  : entry.content
+              }
               accessories={[
                 {
                   tag: {
@@ -61,7 +74,10 @@ export default function ClipboardHistory() {
                           await sendClipboard(entry.content);
                           await showToast(Toast.Style.Success, "Sent to phone");
                         } catch {
-                          await showToast(Toast.Style.Failure, "Failed to send");
+                          await showToast(
+                            Toast.Style.Failure,
+                            "Failed to send",
+                          );
                         }
                       }}
                     />

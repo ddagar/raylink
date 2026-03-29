@@ -1,8 +1,27 @@
-import { MenuBarExtra, Icon, Clipboard, showHUD, launchCommand, LaunchType, Cache, environment } from "@raycast/api";
+import {
+  MenuBarExtra,
+  Icon,
+  Clipboard,
+  showHUD,
+  launchCommand,
+  LaunchType,
+  Cache,
+  environment,
+} from "@raycast/api";
 import { usePromise } from "@raycast/utils";
-import { getDaemonStatus, getDevices, getClipboardHistory, getTransfers, sendClipboard } from "./lib/daemon-client";
+import {
+  getDaemonStatus,
+  getDevices,
+  getClipboardHistory,
+  getTransfers,
+  sendClipboard,
+} from "./lib/daemon-client";
 import { getPreferences } from "./lib/preferences";
-import { type Device, type ClipboardEntry, type FileTransfer } from "./lib/types";
+import {
+  type Device,
+  type ClipboardEntry,
+  type FileTransfer,
+} from "./lib/types";
 import { useEffect } from "react";
 
 const cache = new Cache();
@@ -79,19 +98,24 @@ export default function Status() {
       ? Icon.CheckCircle
       : Icon.Circle;
 
-  const title = hasConnection
-    ? connectedDevices[0].name
-    : undefined;
+  const title = hasConnection ? connectedDevices[0].name : undefined;
 
   return (
     <MenuBarExtra icon={icon} title={title} tooltip="Android Link">
       {!isRunning ? (
-        <MenuBarExtra.Item title="Daemon not running" icon={Icon.ExclamationMark} />
+        <MenuBarExtra.Item
+          title="Daemon not running"
+          icon={Icon.ExclamationMark}
+        />
       ) : (
         <>
           <MenuBarExtra.Section title="Status">
             <MenuBarExtra.Item
-              title={hasConnection ? `Connected to ${connectedDevices.length} device(s)` : "No devices connected"}
+              title={
+                hasConnection
+                  ? `Connected to ${connectedDevices.length} device(s)`
+                  : "No devices connected"
+              }
               icon={hasConnection ? Icon.CheckCircle : Icon.Circle}
             />
           </MenuBarExtra.Section>
@@ -119,14 +143,20 @@ export default function Status() {
                 title="Open Devices"
                 icon={Icon.Mobile}
                 onAction={() =>
-                  launchCommand({ name: "devices", type: LaunchType.UserInitiated })
+                  launchCommand({
+                    name: "devices",
+                    type: LaunchType.UserInitiated,
+                  })
                 }
               />
               <MenuBarExtra.Item
                 title="Open Clipboard History"
                 icon={Icon.Clipboard}
                 onAction={() =>
-                  launchCommand({ name: "clipboard-history", type: LaunchType.UserInitiated })
+                  launchCommand({
+                    name: "clipboard-history",
+                    type: LaunchType.UserInitiated,
+                  })
                 }
               />
             </MenuBarExtra.Section>
@@ -135,15 +165,17 @@ export default function Status() {
           {transfers && transfers.length > 0 && (
             <MenuBarExtra.Section title="Recent Transfers">
               {transfers.slice(0, 3).map((t) => {
-                const icon = t.status === "completed"
-                  ? Icon.CheckCircle
-                  : t.status === "in_progress"
-                    ? Icon.Clock
-                    : t.status === "failed"
-                      ? Icon.XMarkCircle
-                      : Icon.Document;
+                const icon =
+                  t.status === "completed"
+                    ? Icon.CheckCircle
+                    : t.status === "in_progress"
+                      ? Icon.Clock
+                      : t.status === "failed"
+                        ? Icon.XMarkCircle
+                        : Icon.Document;
                 const arrow = t.direction === "incoming" ? "v " : "^ ";
-                const progress = t.status === "in_progress" ? ` ${t.progress}%` : "";
+                const progress =
+                  t.status === "in_progress" ? ` ${t.progress}%` : "";
                 return (
                   <MenuBarExtra.Item
                     key={`xfer-${t.id}`}
@@ -161,7 +193,10 @@ export default function Status() {
               {history.slice(0, 5).map((entry) => (
                 <MenuBarExtra.Item
                   key={`clip-${entry.timestamp}-${entry.source}`}
-                  title={entry.content.substring(0, 40) + (entry.content.length > 40 ? "..." : "")}
+                  title={
+                    entry.content.substring(0, 40) +
+                    (entry.content.length > 40 ? "..." : "")
+                  }
                   icon={entry.source === "android" ? Icon.Mobile : Icon.Monitor}
                   tooltip={`${entry.source === "android" ? "From phone" : "From Mac"} at ${new Date(entry.timestamp).toLocaleTimeString()}`}
                   onAction={async () => {

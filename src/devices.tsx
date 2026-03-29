@@ -1,6 +1,22 @@
-import { List, ActionPanel, Action, Icon, Color, showToast, Toast, confirmAlert, Detail } from "@raycast/api";
+import {
+  List,
+  ActionPanel,
+  Action,
+  Icon,
+  Color,
+  showToast,
+  Toast,
+  confirmAlert,
+  Detail,
+} from "@raycast/api";
 import { usePromise } from "@raycast/utils";
-import { getDevices, unpairDevice, getDaemonStatus, getPairingState, pairDevice, rejectPairing } from "./lib/daemon-client";
+import {
+  getDevices,
+  unpairDevice,
+  getPairingState,
+  pairDevice,
+  rejectPairing,
+} from "./lib/daemon-client";
 import { ensureDaemonRunning, startDaemon } from "./lib/daemon-manager";
 import { type Device } from "./lib/types";
 
@@ -49,19 +65,16 @@ export default function Devices() {
       return getDevices();
     },
     [],
-    { execute: daemonOk === true }
+    { execute: daemonOk === true },
   );
 
-  const {
-    data: pairingState,
-    revalidate: reloadPairing,
-  } = usePromise(
+  const { data: pairingState, revalidate: reloadPairing } = usePromise(
     async () => {
       if (!daemonOk) return null;
       return getPairingState();
     },
     [],
-    { execute: daemonOk === true }
+    { execute: daemonOk === true },
   );
 
   const isLoading = daemonLoading || devicesLoading;
@@ -76,7 +89,10 @@ export default function Devices() {
               title="Start Daemon"
               icon={Icon.Play}
               onAction={async () => {
-                const toast = await showToast(Toast.Style.Animated, "Starting daemon...");
+                const toast = await showToast(
+                  Toast.Style.Animated,
+                  "Starting daemon...",
+                );
                 try {
                   await startDaemon();
                   toast.style = Toast.Style.Success;
@@ -88,14 +104,19 @@ export default function Devices() {
                 }
               }}
             />
-            <Action title="Retry Connection" icon={Icon.ArrowClockwise} onAction={recheckDaemon} />
+            <Action
+              title="Retry Connection"
+              icon={Icon.ArrowClockwise}
+              onAction={recheckDaemon}
+            />
           </ActionPanel>
         }
       />
     );
   }
 
-  const hasPendingPairing = pairingState?.state === "incoming_request" && pairingState.pending;
+  const hasPendingPairing =
+    pairingState?.state === "incoming_request" && pairingState.pending;
 
   return (
     <List isLoading={isLoading} searchBarPlaceholder="Search devices...">
@@ -159,7 +180,11 @@ export default function Devices() {
               ]}
               actions={
                 <ActionPanel>
-                  <Action title="Refresh" icon={Icon.ArrowClockwise} onAction={reloadDevices} />
+                  <Action
+                    title="Refresh"
+                    icon={Icon.ArrowClockwise}
+                    onAction={reloadDevices}
+                  />
                   <Action
                     title="Unpair Device"
                     icon={Icon.Trash}
@@ -189,7 +214,11 @@ export default function Devices() {
             subtitle="Open RayLink on your Android phone to pair"
             actions={
               <ActionPanel>
-                <Action title="Refresh" icon={Icon.ArrowClockwise} onAction={reloadDevices} />
+                <Action
+                  title="Refresh"
+                  icon={Icon.ArrowClockwise}
+                  onAction={reloadDevices}
+                />
               </ActionPanel>
             }
           />

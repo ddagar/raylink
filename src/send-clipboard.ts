@@ -6,7 +6,11 @@ export default async function SendClipboard() {
   try {
     const running = await ensureDaemonRunning();
     if (!running) {
-      await showToast(Toast.Style.Failure, "Daemon not running", "Start the RayLink daemon first");
+      await showToast(
+        Toast.Style.Failure,
+        "Daemon not running",
+        "Start the RayLink daemon first",
+      );
       return;
     }
 
