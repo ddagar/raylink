@@ -3,6 +3,7 @@ package com.raylink.service
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -36,6 +37,9 @@ class ConnectionService : Service() {
     private var lastReceivedTime: Long = 0
     private val echoWindowMs = 2000L
 
+    // Track last sent clipboard to avoid duplicates
+    private var lastSentClipboard: String? = null
+
     // File receive state: transferId -> accumulated chunks
     private val incomingFiles = mutableMapOf<String, IncomingFile>()
 
@@ -64,6 +68,10 @@ class ConnectionService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Handle "Send Clipboard" action from notification
+        if (intent?.action == ACTION_SEND_CLIPBOARD) {
+            sendCurrentClipboard()
+        }
         return START_STICKY
     }
 
@@ -105,16 +113,81 @@ class ConnectionService : Service() {
     }
 
     private fun setupClipboardMonitoring() {
+        // Method 1: Accessibility Service (works in background on most devices)
         ClipboardAccessibilityService.onClipboardChanged = { content ->
-            if (isPaired && wsClient.isConnected()) {
-                val isEcho = content == lastReceivedClipboard &&
-                    (System.currentTimeMillis() - lastReceivedTime) < echoWindowMs
-                if (!isEcho) {
-                    Log.d(TAG, "Sending clipboard to Mac: ${content.take(50)}...")
-                    wsClient.sendClipboard(content)
-                } else {
-                    Log.d(TAG, "Suppressing clipboard echo")
+            trySendClipboard(content)
+        }
+
+        // Method 2: ClipboardManager listener (works when service has focus)
+        // This is a fallback for devices where accessibility events don't trigger
+        scope.launch(Dispatchers.Main) {
+            try {
+                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                clipboard.addPrimaryClipChangedListener {
+                    try {
+                        val clip = clipboard.primaryClip
+                        if (clip != null && clip.itemCount > 0) {
+                            val content = clip.getItemAt(0).text?.toString()
+                            if (content != null) {
+                                trySendClipboard(content)
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.d(TAG, "ClipChangedListener: ${e.message}")
+                    }
                 }
+                Log.d(TAG, "ClipboardManager listener registered")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to register clipboard listener: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Attempt to send clipboard content to Mac.
+     * Handles echo suppression and deduplication.
+     */
+    private fun trySendClipboard(content: String) {
+        if (!isPaired || !wsClient.isConnected()) return
+
+        // Don't echo back what we just received from Mac
+        val isEcho = content == lastReceivedClipboard &&
+            (System.currentTimeMillis() - lastReceivedTime) < echoWindowMs
+        if (isEcho) {
+            Log.d(TAG, "Suppressing clipboard echo")
+            return
+        }
+
+        // Don't send duplicates
+        if (content == lastSentClipboard) return
+
+        lastSentClipboard = content
+        Log.d(TAG, "Sending clipboard to Mac: ${content.take(50)}...")
+        wsClient.sendClipboard(content)
+    }
+
+    /**
+     * Read current clipboard and send to Mac. Called from notification action.
+     */
+    private fun sendCurrentClipboard() {
+        if (!isPaired || !wsClient.isConnected()) {
+            Log.w(TAG, "Cannot send clipboard: not connected")
+            return
+        }
+        scope.launch(Dispatchers.Main) {
+            try {
+                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                val clip = clipboard.primaryClip
+                if (clip != null && clip.itemCount > 0) {
+                    val content = clip.getItemAt(0).text?.toString()
+                    if (content != null) {
+                        lastSentClipboard = content
+                        wsClient.sendClipboard(content)
+                        Log.d(TAG, "Sent clipboard from notification: ${content.take(50)}...")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to send clipboard: ${e.message}")
             }
         }
     }
@@ -172,10 +245,7 @@ class ConnectionService : Service() {
             }
 
             MessageType.CLIPBOARD_REQUEST -> {
-                val clipboard = getDeviceClipboard()
-                if (clipboard != null) {
-                    wsClient.sendClipboard(clipboard)
-                }
+                sendCurrentClipboard()
             }
 
             MessageType.FILE_OFFER -> {
@@ -188,7 +258,6 @@ class ConnectionService : Service() {
 
                 incomingFiles[transferId] = IncomingFile(fileName, fileSize, mimeType)
 
-                // Auto-accept
                 wsClient.send(Protocol.createMessage(
                     MessageType.FILE_ACCEPT,
                     mapOf("transferId" to transferId)
@@ -221,7 +290,6 @@ class ConnectionService : Service() {
     private fun saveReceivedFile(transferId: String, incoming: IncomingFile) {
         scope.launch {
             try {
-                // Use app-specific external files dir (no special permissions needed on Android 10+)
                 val downloadsDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
                     ?: filesDir
                 downloadsDir.mkdirs()
@@ -299,7 +367,6 @@ class ConnectionService : Service() {
             return
         }
 
-        // Send file offer
         wsClient.send(Protocol.createMessage(
             MessageType.FILE_OFFER,
             mapOf(
@@ -310,7 +377,6 @@ class ConnectionService : Service() {
             )
         ))
 
-        // Send chunks immediately (Mac auto-accepts)
         scope.launch {
             val chunkSize = Protocol.FILE_CHUNK_SIZE
             var offset = 0
@@ -348,11 +414,25 @@ class ConnectionService : Service() {
     }
 
     private fun createNotification(text: String): Notification {
+        // "Send Clipboard" action intent
+        val sendClipIntent = Intent(this, ConnectionService::class.java).apply {
+            action = ACTION_SEND_CLIPBOARD
+        }
+        val sendClipPending = PendingIntent.getService(
+            this, 0, sendClipIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         return Notification.Builder(this, CHANNEL_ID)
             .setContentTitle("RayLink")
             .setContentText(text)
             .setSmallIcon(android.R.drawable.stat_notify_sync)
             .setOngoing(true)
+            .addAction(
+                Notification.Action.Builder(
+                    null, "Send Clipboard", sendClipPending
+                ).build()
+            )
             .build()
     }
 
@@ -365,6 +445,7 @@ class ConnectionService : Service() {
         private const val TAG = "ConnectionService"
         private const val CHANNEL_ID = "raylink_connection"
         private const val NOTIFICATION_ID = 1
+        private const val ACTION_SEND_CLIPBOARD = "com.raylink.SEND_CLIPBOARD"
 
         var instance: ConnectionService? = null
             private set
@@ -379,7 +460,6 @@ class ConnectionService : Service() {
             context.stopService(intent)
         }
 
-        /** Called from ShareReceiverActivity to send clipboard text */
         fun sendClipboardFromShare(content: String) {
             instance?.let {
                 if (it.isPaired && it.wsClient.isConnected()) {
@@ -388,7 +468,6 @@ class ConnectionService : Service() {
             }
         }
 
-        /** Called from ShareReceiverActivity to send a file */
         fun sendFileFromShare(transferId: String, fileName: String, mimeType: String, data: ByteArray) {
             instance?.doSendFile(transferId, fileName, mimeType, data)
         }
