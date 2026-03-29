@@ -19,10 +19,10 @@ export default async function SendClipboard() {
     await sendClipboard(text);
     await showHUD("Clipboard sent to phone");
   } catch (error) {
-    await showToast(
-      Toast.Style.Failure,
-      "Failed to send clipboard",
-      error instanceof Error ? error.message : String(error)
-    );
+    const msg = error instanceof Error ? error.message : String(error);
+    const title = msg.includes("No devices connected")
+      ? "No phone connected"
+      : "Failed to send clipboard";
+    await showToast(Toast.Style.Failure, title, msg);
   }
 }

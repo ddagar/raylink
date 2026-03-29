@@ -4,12 +4,9 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
-import android.util.Base64
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
-import com.raylink.network.MessageType
-import com.raylink.network.Protocol
 import com.raylink.service.ConnectionService
 import java.io.ByteArrayOutputStream
 import java.util.UUID

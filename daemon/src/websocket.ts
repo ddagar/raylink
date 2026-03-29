@@ -260,11 +260,12 @@ export class WebSocketManager {
 
       case "file.offer": {
         if (!device.paired) return;
-        const body = msg.body as {
-          fileName: string;
-          fileSize: number;
-          mimeType: string;
-          transferId: string;
+        const raw = msg.body as Record<string, unknown>;
+        const body = {
+          fileName: String(raw.fileName),
+          fileSize: Number(raw.fileSize) || 0,
+          mimeType: String(raw.mimeType),
+          transferId: String(raw.transferId),
         };
         this.fileTransferManager.handleFileOffer(body, sendToThis);
         console.log(`[ws] Incoming file: ${body.fileName} (${body.fileSize} bytes)`);
@@ -287,11 +288,13 @@ export class WebSocketManager {
 
       case "file.chunk": {
         if (!device.paired) return;
-        const body = msg.body as {
-          transferId: string;
-          data: string;
-          offset: number;
-          isLast: boolean;
+        const raw = msg.body as Record<string, unknown>;
+        const body = {
+          transferId: String(raw.transferId),
+          data: String(raw.data),
+          offset: Number(raw.offset) || 0,
+          // Handle both boolean true and string "true" (Android sends strings)
+          isLast: raw.isLast === true || raw.isLast === "true",
         };
         this.fileTransferManager.handleFileChunk(body).catch((err) => {
           console.error(`[ws] Failed to handle file chunk: ${err.message}`);

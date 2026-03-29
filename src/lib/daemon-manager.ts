@@ -3,6 +3,7 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
+import { environment } from "@raycast/api";
 import { isDaemonRunning } from "./daemon-client";
 
 const LAUNCH_AGENT_LABEL = "com.raycast-android.daemon";
@@ -12,9 +13,14 @@ const DATA_DIR = join(homedir(), ".raycast-android");
 const LOG_DIR = join(DATA_DIR, "logs");
 
 function getDaemonDir(): string {
-  // In development, use the local daemon directory
-  // In production, this should be the installed location
-  return join(__dirname, "..", "..", "daemon");
+  // In development, Raycast runs from the project root
+  // environment.assetsPath → <project>/assets, so daemon is a sibling
+  const assetsDir = environment.assetsPath;
+  const projectRoot = join(assetsDir, "..");
+  const daemonDir = join(projectRoot, "daemon");
+  if (existsSync(daemonDir)) return daemonDir;
+  // Fallback: installed daemon location
+  return join(DATA_DIR, "daemon");
 }
 
 export async function ensureDaemonRunning(): Promise<boolean> {

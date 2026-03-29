@@ -146,10 +146,15 @@ export class ApiServer {
 
     // Send clipboard to all connected devices
     this.app.post("/clipboard/send", async (req, res) => {
+      const connected = this.wsManager.getConnectedDevices();
+      if (connected.length === 0) {
+        res.status(404).json({ error: "No devices connected" });
+        return;
+      }
+
       let content = (req.body as { content?: string })?.content;
 
       if (!content) {
-        // Read from macOS clipboard
         content = (await this.clipboardMonitor.getClipboard()) || undefined;
       }
 
