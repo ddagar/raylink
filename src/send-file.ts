@@ -88,7 +88,7 @@ export default async function SendFile() {
       toast.title = "Transfer timed out";
     };
 
-    pollCompletion();
+    await pollCompletion();
   } catch (error) {
     await showToast(
       Toast.Style.Failure,

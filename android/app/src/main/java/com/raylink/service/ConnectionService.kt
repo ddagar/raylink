@@ -41,10 +41,10 @@ class ConnectionService : Service() {
 
     private data class IncomingFile(
         val fileName: String,
-        val fileSize: Int,
+        val fileSize: Long,
         val mimeType: String,
         val chunks: MutableList<ByteArray> = mutableListOf(),
-        var receivedBytes: Int = 0
+        var receivedBytes: Long = 0
     )
 
     override fun onCreate() {
@@ -169,7 +169,7 @@ class ConnectionService : Service() {
             MessageType.FILE_OFFER -> {
                 val transferId = message.bodyString("transferId") ?: return
                 val fileName = message.bodyString("fileName") ?: "unknown"
-                val fileSize = message.bodyString("fileSize")?.toIntOrNull() ?: 0
+                val fileSize = message.bodyLong("fileSize")
                 val mimeType = message.bodyString("mimeType") ?: "application/octet-stream"
 
                 Log.d(TAG, "Incoming file: $fileName ($fileSize bytes)")
@@ -188,12 +188,12 @@ class ConnectionService : Service() {
             MessageType.FILE_CHUNK -> {
                 val transferId = message.bodyString("transferId") ?: return
                 val data = message.bodyString("data") ?: return
-                val isLast = message.bodyString("isLast") == "true"
+                val isLast = message.bodyBoolean("isLast")
 
                 val incoming = incomingFiles[transferId] ?: return
                 val chunk = Base64.decode(data, Base64.DEFAULT)
                 incoming.chunks.add(chunk)
-                incoming.receivedBytes += chunk.size
+                incoming.receivedBytes += chunk.size.toLong()
 
                 if (isLast) {
                     saveReceivedFile(transferId, incoming)
@@ -209,9 +209,9 @@ class ConnectionService : Service() {
     private fun saveReceivedFile(transferId: String, incoming: IncomingFile) {
         scope.launch {
             try {
-                val downloadsDir = Environment.getExternalStoragePublicDirectory(
-                    Environment.DIRECTORY_DOWNLOADS
-                )
+                // Use app-specific external files dir (no special permissions needed on Android 10+)
+                val downloadsDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+                    ?: filesDir
                 downloadsDir.mkdirs()
 
                 val file = getUniqueFile(downloadsDir, incoming.fileName)

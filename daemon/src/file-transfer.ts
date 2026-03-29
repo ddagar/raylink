@@ -92,6 +92,7 @@ export class FileTransferManager {
     const transfer = this.transfers.get(transferId);
     if (!transfer) return;
     transfer.status = "rejected";
+    this.transferSenders.delete(transferId);
   }
 
   handleFileOffer(body: {
@@ -103,7 +104,7 @@ export class FileTransferManager {
     const transfer: FileTransfer = {
       id: body.transferId,
       fileName: body.fileName,
-      fileSize: typeof body.fileSize === "number" ? body.fileSize : parseInt(String(body.fileSize), 10),
+      fileSize: Math.max(0, typeof body.fileSize === "number" ? body.fileSize : (parseInt(String(body.fileSize), 10) || 0)),
       mimeType: body.mimeType,
       direction: "incoming",
       status: "pending",
