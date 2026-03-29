@@ -173,8 +173,8 @@ export class ApiServer {
     });
 
     // Get latest clipboard from device
-    this.app.get("/devices/:id/clipboard/latest", (_req, res) => {
-      const latest = this.clipboardMonitor.getLatestFromDevice();
+    this.app.get("/devices/:id/clipboard/latest", (req, res) => {
+      const latest = this.clipboardMonitor.getLatestFromDevice(req.params.id);
       if (latest) {
         res.json(latest);
       } else {
@@ -182,8 +182,18 @@ export class ApiServer {
       }
     });
 
+    // Get latest clipboard from any device (for menu bar auto-sync)
+    this.app.get("/clipboard/latest", (_req, res) => {
+      const latest = this.clipboardMonitor.getLatestFromDevice();
+      if (latest) {
+        res.json(latest);
+      } else {
+        res.json(null);
+      }
+    });
+
     // Request clipboard from device
-    this.app.post("/clipboard/pull", (req, res) => {
+    this.app.post("/clipboard/pull", (_req, res) => {
       const connected = this.wsManager.getConnectedDevices();
       if (connected.length === 0) {
         res.status(404).json({ error: "No devices connected" });

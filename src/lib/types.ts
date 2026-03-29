@@ -14,6 +14,7 @@ export type MessageType =
   | "pair.accept"
   | "pair.reject"
   | "clipboard.update"
+  | "clipboard.connect"
   | "clipboard.request"
   | "file.offer"
   | "file.accept"

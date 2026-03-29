@@ -5,6 +5,7 @@ export interface ClipboardEntry {
   content: string;
   contentType: "text" | "html";
   source: "mac" | "android";
+  deviceId?: string;
   deviceName?: string;
   timestamp: number;
 }
@@ -16,7 +17,7 @@ export class ClipboardMonitor {
   private interval: ReturnType<typeof setInterval> | null = null;
   private history: ClipboardEntry[] = [];
   private onChange: ((content: string) => void) | null = null;
-  private suppressNextChange = false;
+  private settingClipboard = false;
 
   onClipboardChange(callback: (content: string) => void): void {
     this.onChange = callback;
@@ -33,18 +34,15 @@ export class ClipboardMonitor {
     });
 
     this.interval = setInterval(async () => {
+      // Skip polling while we're in the middle of setting the clipboard
+      if (this.settingClipboard) return;
+
       const content = await this.readClipboard();
       if (content === null) return;
 
       const currentHash = this.hash(content);
       if (currentHash !== this.lastHash) {
         this.lastHash = currentHash;
-
-        if (this.suppressNextChange) {
-          this.suppressNextChange = false;
-          return;
-        }
-
         this.onChange?.(content);
       }
     }, pollIntervalMs);
@@ -61,14 +59,20 @@ export class ClipboardMonitor {
   }
 
   async setClipboard(content: string): Promise<void> {
-    // Suppress the next change detection since we're setting it ourselves
-    this.suppressNextChange = true;
-    this.lastHash = this.hash(content);
+    // Block polling while we write to the clipboard to avoid detecting our own change
+    this.settingClipboard = true;
+    const contentHash = this.hash(content);
 
-    return new Promise((resolve, reject) => {
+    return new Promise<void>((resolve, reject) => {
       const proc = execFile("pbcopy", [], (err) => {
-        if (err) reject(err);
-        else resolve();
+        if (err) {
+          this.settingClipboard = false;
+          reject(err);
+        } else {
+          this.lastHash = contentHash;
+          this.settingClipboard = false;
+          resolve();
+        }
       });
       proc.stdin?.write(content);
       proc.stdin?.end();
@@ -90,7 +94,10 @@ export class ClipboardMonitor {
     return [...this.history];
   }
 
-  getLatestFromDevice(): ClipboardEntry | undefined {
+  getLatestFromDevice(deviceId?: string): ClipboardEntry | undefined {
+    if (deviceId) {
+      return this.history.find((e) => e.source === "android" && e.deviceId === deviceId);
+    }
     return this.history.find((e) => e.source === "android");
   }
 

@@ -9,7 +9,7 @@ import {
   WEBSOCKET_PORT,
 } from "./protocol.js";
 import { PairingManager } from "./pairing.js";
-import { ClipboardMonitor, type ClipboardEntry } from "./clipboard.js";
+import { ClipboardMonitor } from "./clipboard.js";
 import { FileTransferManager } from "./file-transfer.js";
 import { DeviceStore } from "./device-store.js";
 
@@ -46,8 +46,6 @@ export class WebSocketManager {
     this.clipboardMonitor = clipboardMonitor;
     this.fileTransferManager = fileTransferManager;
     this.deviceStore = deviceStore;
-
-    this.setupMessageSenders();
   }
 
   setOnDeviceConnected(callback: (device: ConnectedDevice) => void): void {
@@ -62,7 +60,6 @@ export class WebSocketManager {
     this.httpsServer = createServer({
       cert: this.certInfo.cert,
       key: this.certInfo.key,
-      // Accept all client certificates (we verify via our own pairing)
       requestCert: false,
       rejectUnauthorized: false,
     });
@@ -152,18 +149,31 @@ export class WebSocketManager {
     }
   }
 
-  private setupMessageSenders(): void {
-    // The pairing manager and file transfer manager need to send messages
-    // through the current active connection. We use a per-connection sender
-    // that gets set up in handleMessage when we know which connection to use.
-  }
-
-  private handleMessage(ws: WebSocket, device: ConnectedDevice, msg: Message): void {
-    const sendToThis = (reply: Message) => {
+  /** Create a sender function scoped to a specific WebSocket connection */
+  private createSender(ws: WebSocket): (msg: Message) => void {
+    return (reply: Message) => {
       if (ws.readyState === WebSocket.OPEN) {
         ws.send(serializeMessage(reply));
       }
     };
+  }
+
+  /** Send the current Mac clipboard to a newly connected device */
+  private sendClipboardConnect(send: (msg: Message) => void): void {
+    this.clipboardMonitor.getClipboard()
+      .then((content) => {
+        if (content) {
+          send(createMessage("clipboard.connect", { content, contentType: "text" }));
+          console.log("[ws] Sent clipboard.connect to newly paired device");
+        }
+      })
+      .catch((err) => {
+        console.error(`[ws] Failed to send clipboard.connect: ${err.message}`);
+      });
+  }
+
+  private handleMessage(ws: WebSocket, device: ConnectedDevice, msg: Message): void {
+    const sendToThis = this.createSender(ws);
 
     switch (msg.type) {
       case "pair.request": {
@@ -171,13 +181,15 @@ export class WebSocketManager {
         device.id = body.deviceId;
         device.name = body.deviceName;
 
-        // Set up message sender for this pairing session
+        // Set up per-connection sender and completion callback for this pairing
         this.pairingManager.setMessageSender(sendToThis);
         this.pairingManager.setOnPairingComplete((storedDevice) => {
           device.paired = true;
           device.id = storedDevice.id;
           device.name = storedDevice.name;
           this.onDeviceConnected?.(device);
+          // Send current Mac clipboard on successful pairing
+          this.sendClipboardConnect(sendToThis);
         });
 
         this.pairingManager.handlePairRequest(body);
@@ -191,7 +203,9 @@ export class WebSocketManager {
         device.paired = true;
 
         this.pairingManager.setMessageSender(sendToThis);
-        this.pairingManager.handlePairAccept(body);
+        this.pairingManager.handlePairAccept(body).catch((err) => {
+          console.error(`[ws] Error handling pair accept: ${err.message}`);
+        });
         this.onDeviceConnected?.(device);
         break;
       }
@@ -201,20 +215,24 @@ export class WebSocketManager {
         break;
       }
 
+      case "clipboard.connect":
       case "clipboard.update": {
         const body = msg.body as { content: string; contentType: "text" | "html" };
         if (!device.paired) return;
 
         console.log(`[ws] Clipboard from ${device.name}: ${body.content.substring(0, 50)}...`);
 
-        // Set macOS clipboard
-        this.clipboardMonitor.setClipboard(body.content);
+        // Set macOS clipboard (with proper await + error handling)
+        this.clipboardMonitor.setClipboard(body.content).catch((err) => {
+          console.error(`[ws] Failed to set clipboard: ${err.message}`);
+        });
 
-        // Add to history
+        // Add to history with device info
         this.clipboardMonitor.addToHistory({
           content: body.content,
           contentType: body.contentType,
           source: "android",
+          deviceId: device.id,
           deviceName: device.name,
           timestamp: Date.now(),
         });
@@ -223,16 +241,20 @@ export class WebSocketManager {
 
       case "clipboard.request": {
         if (!device.paired) return;
-        this.clipboardMonitor.getClipboard().then((content) => {
-          if (content) {
-            sendToThis(
-              createMessage("clipboard.update", {
-                content,
-                contentType: "text",
-              })
-            );
-          }
-        });
+        this.clipboardMonitor.getClipboard()
+          .then((content) => {
+            if (content) {
+              sendToThis(
+                createMessage("clipboard.update", {
+                  content,
+                  contentType: "text",
+                })
+              );
+            }
+          })
+          .catch((err) => {
+            console.error(`[ws] Failed to read clipboard for request: ${err.message}`);
+          });
         break;
       }
 
@@ -244,6 +266,7 @@ export class WebSocketManager {
           mimeType: string;
           transferId: string;
         };
+        // Per-connection sender for this file transfer
         this.fileTransferManager.setMessageSender(sendToThis);
         this.fileTransferManager.handleFileOffer(body);
         console.log(`[ws] Incoming file: ${body.fileName} (${body.fileSize} bytes)`);
@@ -273,7 +296,9 @@ export class WebSocketManager {
           offset: number;
           isLast: boolean;
         };
-        this.fileTransferManager.handleFileChunk(body);
+        this.fileTransferManager.handleFileChunk(body).catch((err) => {
+          console.error(`[ws] Failed to handle file chunk: ${err.message}`);
+        });
         break;
       }
 
@@ -284,7 +309,7 @@ export class WebSocketManager {
 
       case "pong": {
         if (device.id) {
-          this.deviceStore.updateLastSeen(device.id);
+          this.deviceStore.updateLastSeen(device.id).catch(() => {});
         }
         break;
       }

@@ -17,6 +17,7 @@ object MessageType {
     const val PAIR_ACCEPT = "pair.accept"
     const val PAIR_REJECT = "pair.reject"
     const val CLIPBOARD_UPDATE = "clipboard.update"
+    const val CLIPBOARD_CONNECT = "clipboard.connect"
     const val CLIPBOARD_REQUEST = "clipboard.request"
     const val FILE_OFFER = "file.offer"
     const val FILE_ACCEPT = "file.accept"

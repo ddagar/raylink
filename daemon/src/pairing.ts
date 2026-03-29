@@ -137,7 +137,7 @@ export class PairingManager {
     this.pending = null;
   }
 
-  handlePairAccept(body: PairAcceptBody): void {
+  async handlePairAccept(body: PairAcceptBody): Promise<void> {
     if (this.state !== "outgoing_request") {
       // Could be auto-accept from an already-paired device
       // Store/update anyway
@@ -152,7 +152,7 @@ export class PairingManager {
       lastSeen: Date.now(),
     };
 
-    this.deviceStore.addDevice(device);
+    await this.deviceStore.addDevice(device);
     this.onPairingComplete?.(device);
 
     console.log(`[pairing] Pairing accepted by ${device.name}`);

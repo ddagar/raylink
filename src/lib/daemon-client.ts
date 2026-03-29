@@ -75,6 +75,10 @@ export async function getClipboardHistory(): Promise<ClipboardEntry[]> {
   return request<ClipboardEntry[]>("/clipboard/history");
 }
 
+export async function getLatestClipboardFromPhone(): Promise<ClipboardEntry | null> {
+  return request<ClipboardEntry | null>("/clipboard/latest");
+}
+
 export async function getLatestDeviceClipboard(deviceId: string): Promise<ClipboardEntry> {
   return request<ClipboardEntry>(`/devices/${deviceId}/clipboard/latest`);
 }

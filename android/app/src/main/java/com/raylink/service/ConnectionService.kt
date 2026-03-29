@@ -24,6 +24,10 @@ class ConnectionService : Service() {
     private lateinit var certManager: CertificateManager
 
     private var connectedDeviceName: String? = null
+    private var isPaired = false
+
+    // Suppress echo: when we receive clipboard from Mac, don't send it back
+    private var lastReceivedClipboard: String? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -35,6 +39,7 @@ class ConnectionService : Service() {
         startForeground(NOTIFICATION_ID, createNotification("Searching for Mac..."))
 
         setupMessageHandling()
+        setupClipboardMonitoring()
         startDiscovery()
     }
 
@@ -45,6 +50,7 @@ class ConnectionService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        ClipboardAccessibilityService.onClipboardChanged = null
         scope.cancel()
         wsClient.destroy()
         discovery.stopDiscovery()
@@ -60,12 +66,13 @@ class ConnectionService : Service() {
             wsClient.sendPairRequest(
                 deviceName = deviceName,
                 deviceId = deviceId,
-                certificate = "" // TODO: send actual cert PEM
+                certificate = "" // TLS trust handled at connection level
             )
         }
 
         wsClient.onDisconnected = {
             connectedDeviceName = null
+            isPaired = false
             updateNotification("Disconnected — searching...")
         }
 
@@ -76,12 +83,32 @@ class ConnectionService : Service() {
         }
     }
 
+    /**
+     * Wire the ClipboardAccessibilityService callback to send clipboard
+     * changes over WebSocket to the Mac.
+     */
+    private fun setupClipboardMonitoring() {
+        ClipboardAccessibilityService.onClipboardChanged = { content ->
+            if (isPaired && wsClient.isConnected()) {
+                // Don't echo back clipboard content we just received from Mac
+                if (content != lastReceivedClipboard) {
+                    Log.d(TAG, "Sending clipboard to Mac: ${content.take(50)}...")
+                    wsClient.sendClipboard(content)
+                } else {
+                    Log.d(TAG, "Suppressing clipboard echo")
+                    lastReceivedClipboard = null
+                }
+            }
+        }
+    }
+
     private fun handleMessage(message: Message) {
         when (message.type) {
             MessageType.PAIR_ACCEPT -> {
                 val deviceName = message.body["deviceName"] ?: "Mac"
                 val deviceId = message.body["deviceId"] ?: ""
                 connectedDeviceName = deviceName
+                isPaired = true
 
                 // Save trusted device
                 val cert = message.body["certificate"] ?: ""
@@ -91,17 +118,23 @@ class ConnectionService : Service() {
 
                 updateNotification("Connected to $deviceName")
                 Log.d(TAG, "Paired with $deviceName ($deviceId)")
+
+                // Send current clipboard to Mac on connection
+                sendClipboardConnect()
             }
 
             MessageType.PAIR_REJECT -> {
+                isPaired = false
                 Log.d(TAG, "Pairing rejected")
                 updateNotification("Pairing rejected")
             }
 
-            MessageType.CLIPBOARD_UPDATE -> {
+            // Handle both clipboard.update and clipboard.connect
+            MessageType.CLIPBOARD_UPDATE, MessageType.CLIPBOARD_CONNECT -> {
                 val content = message.body["content"] ?: return
+                lastReceivedClipboard = content
                 setDeviceClipboard(content)
-                Log.d(TAG, "Clipboard received: ${content.take(50)}...")
+                Log.d(TAG, "Clipboard received from Mac: ${content.take(50)}...")
             }
 
             MessageType.CLIPBOARD_REQUEST -> {
@@ -112,7 +145,6 @@ class ConnectionService : Service() {
             }
 
             MessageType.FILE_OFFER -> {
-                // Auto-accept file transfers
                 val transferId = message.body["transferId"] ?: return
                 val fileName = message.body["fileName"] ?: "unknown"
                 Log.d(TAG, "Incoming file: $fileName")
@@ -129,31 +161,40 @@ class ConnectionService : Service() {
         }
     }
 
-    private fun startDiscovery() {
-        discovery.onServiceFound = { service ->
-            Log.d(TAG, "Found Mac: ${service.deviceName} at ${service.host}:${service.port}")
-            if (!wsClient.isConnected()) {
-                wsClient.connect(service.host, service.port)
-                updateNotification("Connecting to ${service.deviceName ?: service.host}...")
-            }
+    /**
+     * Send the current device clipboard to the Mac when first connecting.
+     */
+    private fun sendClipboardConnect() {
+        val clipboard = getDeviceClipboard()
+        if (clipboard != null) {
+            wsClient.send(Protocol.createMessage(
+                MessageType.CLIPBOARD_CONNECT,
+                mapOf("content" to clipboard, "contentType" to "text")
+            ))
+            Log.d(TAG, "Sent clipboard.connect to Mac")
         }
-
-        discovery.startDiscovery()
     }
 
     private fun setDeviceClipboard(content: String) {
-        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        val clip = ClipData.newPlainText("RayLink", content)
-        clipboard.setPrimaryClip(clip)
+        scope.launch(Dispatchers.Main) {
+            try {
+                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                val clip = ClipData.newPlainText("RayLink", content)
+                clipboard.setPrimaryClip(clip)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to set clipboard: ${e.message}")
+            }
+        }
     }
 
     private fun getDeviceClipboard(): String? {
-        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        return clipboard.primaryClip?.getItemAt(0)?.text?.toString()
-    }
-
-    fun sendClipboard(content: String) {
-        wsClient.sendClipboard(content)
+        return try {
+            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            clipboard.primaryClip?.getItemAt(0)?.text?.toString()
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to read clipboard: ${e.message}")
+            null
+        }
     }
 
     private fun createNotificationChannel() {

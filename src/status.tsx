@@ -1,9 +1,15 @@
-import { MenuBarExtra, Icon, open, launchCommand, LaunchType, Clipboard, showHUD } from "@raycast/api";
+import { MenuBarExtra, Icon, Clipboard, showHUD, launchCommand, LaunchType, Cache } from "@raycast/api";
 import { usePromise } from "@raycast/utils";
-import { getDaemonStatus, getDevices, getClipboardHistory, sendClipboard } from "./lib/daemon-client";
+import { getDaemonStatus, getDevices, getClipboardHistory, getLatestClipboardFromPhone, sendClipboard } from "./lib/daemon-client";
+import { getPreferences } from "./lib/preferences";
 import { type Device, type ClipboardEntry } from "./lib/types";
 
+const cache = new Cache();
+const LAST_SYNC_KEY = "lastSyncTimestamp";
+
 export default function Status() {
+  const prefs = getPreferences();
+
   const { data: status } = usePromise(async () => {
     try {
       return await getDaemonStatus();
@@ -22,7 +28,25 @@ export default function Status() {
 
   const { data: history } = usePromise(async () => {
     try {
-      return await getClipboardHistory();
+      const entries = await getClipboardHistory();
+
+      // Auto-sync: check if there's a new clipboard from the phone
+      if (prefs.autoSync && entries.length > 0) {
+        const latest = entries.find((e) => e.source === "android");
+        if (latest) {
+          const lastSync = parseInt(cache.get(LAST_SYNC_KEY) || "0", 10);
+          if (latest.timestamp > lastSync) {
+            // New clipboard from phone — auto-copy to Mac
+            await Clipboard.copy(latest.content);
+            cache.set(LAST_SYNC_KEY, String(latest.timestamp));
+            if (prefs.showNotifications) {
+              await showHUD(`Clipboard from ${latest.deviceName || "phone"}`);
+            }
+          }
+        }
+      }
+
+      return entries;
     } catch {
       return [] as ClipboardEntry[];
     }
@@ -61,10 +85,16 @@ export default function Status() {
                 title="Send Clipboard to Phone"
                 icon={Icon.ArrowUp}
                 onAction={async () => {
-                  const text = await Clipboard.readText();
-                  if (text) {
-                    await sendClipboard(text);
-                    await showHUD("Clipboard sent to phone");
+                  try {
+                    const text = await Clipboard.readText();
+                    if (text) {
+                      await sendClipboard(text);
+                      await showHUD("Clipboard sent to phone");
+                    } else {
+                      await showHUD("Clipboard is empty");
+                    }
+                  } catch {
+                    await showHUD("Failed to send clipboard");
                   }
                 }}
               />
@@ -87,14 +117,19 @@ export default function Status() {
 
           {history && history.length > 0 && (
             <MenuBarExtra.Section title="Recent Clipboard">
-              {history.slice(0, 5).map((entry, i) => (
+              {history.slice(0, 5).map((entry) => (
                 <MenuBarExtra.Item
-                  key={`${entry.timestamp}-${i}`}
+                  key={`clip-${entry.timestamp}-${entry.source}`}
                   title={entry.content.substring(0, 40) + (entry.content.length > 40 ? "..." : "")}
                   icon={entry.source === "android" ? Icon.Mobile : Icon.Monitor}
+                  tooltip={`${entry.source === "android" ? "From phone" : "From Mac"} at ${new Date(entry.timestamp).toLocaleTimeString()}`}
                   onAction={async () => {
-                    await Clipboard.copy(entry.content);
-                    await showHUD("Copied to clipboard");
+                    try {
+                      await Clipboard.copy(entry.content);
+                      await showHUD("Copied to clipboard");
+                    } catch {
+                      await showHUD("Failed to copy");
+                    }
                   }}
                 />
               ))}
