@@ -319,19 +319,37 @@ class ConnectionService : Service() {
     private fun saveReceivedFile(transferId: String, incoming: IncomingFile) {
         scope.launch {
             try {
-                val downloadsDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
-                    ?: filesDir
-                downloadsDir.mkdirs()
-
-                val file = getUniqueFile(downloadsDir, incoming.fileName)
-                FileOutputStream(file).use { out ->
-                    for (chunk in incoming.chunks) {
-                        out.write(chunk)
-                    }
+                // Save to public Downloads via MediaStore (visible in Files app)
+                val resolver = contentResolver
+                val contentValues = android.content.ContentValues().apply {
+                    put(android.provider.MediaStore.Downloads.DISPLAY_NAME, incoming.fileName)
+                    put(android.provider.MediaStore.Downloads.MIME_TYPE, incoming.mimeType)
+                    put(android.provider.MediaStore.Downloads.IS_PENDING, 1)
                 }
 
-                Log.d(TAG, "File saved: ${file.absolutePath}")
-                updateNotification("Received ${incoming.fileName}")
+                val uri = resolver.insert(
+                    android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                    contentValues
+                )
+
+                if (uri != null) {
+                    resolver.openOutputStream(uri)?.use { out ->
+                        for (chunk in incoming.chunks) {
+                            out.write(chunk)
+                        }
+                    }
+
+                    // Mark as complete so it's visible to other apps
+                    contentValues.clear()
+                    contentValues.put(android.provider.MediaStore.Downloads.IS_PENDING, 0)
+                    resolver.update(uri, contentValues, null, null)
+
+                    Log.d(TAG, "File saved to Downloads: ${incoming.fileName}")
+                    updateNotification("Received ${incoming.fileName}")
+                } else {
+                    Log.e(TAG, "Failed to create MediaStore entry")
+                    updateNotification("Failed to save ${incoming.fileName}")
+                }
 
                 incomingFiles.remove(transferId)
             } catch (e: Exception) {
