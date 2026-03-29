@@ -11,13 +11,15 @@ export interface ClipboardEntry {
 }
 
 const MAX_HISTORY = 50;
+const MAX_CLIPBOARD_SIZE = 5 * 1024 * 1024; // 5MB
+const PBCOPY_TIMEOUT = 5000; // 5 seconds
 
 export class ClipboardMonitor {
   private lastHash: string = "";
   private interval: ReturnType<typeof setInterval> | null = null;
   private history: ClipboardEntry[] = [];
   private onChange: ((content: string) => void) | null = null;
-  private settingClipboard = false;
+  private writeQueue: Promise<void> = Promise.resolve();
 
   onClipboardChange(callback: (content: string) => void): void {
     this.onChange = callback;
@@ -34,16 +36,19 @@ export class ClipboardMonitor {
     });
 
     this.interval = setInterval(async () => {
-      // Skip polling while we're in the middle of setting the clipboard
-      if (this.settingClipboard) return;
-
       const content = await this.readClipboard();
       if (content === null) return;
 
       const currentHash = this.hash(content);
       if (currentHash !== this.lastHash) {
         this.lastHash = currentHash;
-        this.onChange?.(content);
+
+        // Only fire onChange for content within size limit
+        if (content.length <= MAX_CLIPBOARD_SIZE) {
+          this.onChange?.(content);
+        } else {
+          console.warn(`[clipboard] Content too large (${content.length} bytes), skipping broadcast`);
+        }
       }
     }, pollIntervalMs);
 
@@ -58,19 +63,37 @@ export class ClipboardMonitor {
     }
   }
 
+  /**
+   * Set the macOS clipboard. Writes are serialized via a queue to prevent
+   * concurrent pbcopy calls. Includes a timeout to prevent permanent stalls.
+   */
   async setClipboard(content: string): Promise<void> {
-    // Block polling while we write to the clipboard to avoid detecting our own change
-    this.settingClipboard = true;
+    // Chain writes to serialize concurrent calls
+    this.writeQueue = this.writeQueue.then(
+      () => this.doSetClipboard(content),
+      () => this.doSetClipboard(content) // continue queue even if previous write failed
+    );
+    return this.writeQueue;
+  }
+
+  private doSetClipboard(content: string): Promise<void> {
     const contentHash = this.hash(content);
 
     return new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        proc.kill();
+        // Update hash anyway to prevent change detection loop
+        this.lastHash = contentHash;
+        reject(new Error("pbcopy timed out"));
+      }, PBCOPY_TIMEOUT);
+
       const proc = execFile("pbcopy", [], (err) => {
+        clearTimeout(timer);
+        // Always update the hash so polling doesn't detect our own write
+        this.lastHash = contentHash;
         if (err) {
-          this.settingClipboard = false;
           reject(err);
         } else {
-          this.lastHash = contentHash;
-          this.settingClipboard = false;
           resolve();
         }
       });

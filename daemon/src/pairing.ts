@@ -68,6 +68,12 @@ export class PairingManager {
           certificate: this.localCert,
         } satisfies PairAcceptBody)
       );
+      // Notify that a known device reconnected
+      const device = this.deviceStore.getDevice(body.deviceId);
+      if (device) {
+        this.deviceStore.updateLastSeen(body.deviceId);
+        this.onPairingComplete?.(device);
+      }
       return;
     }
 

@@ -2,6 +2,10 @@ package com.raylink.network
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import java.util.UUID
 
 @Serializable
@@ -9,8 +13,12 @@ data class Message(
     val id: String = UUID.randomUUID().toString(),
     val type: String,
     val timestamp: Long = System.currentTimeMillis(),
-    val body: Map<String, String> = emptyMap()
-)
+    val body: Map<String, JsonElement> = emptyMap()
+) {
+    /** Get a body value as a string, or null if missing */
+    fun bodyString(key: String): String? =
+        body[key]?.jsonPrimitive?.contentOrNull
+}
 
 object MessageType {
     const val PAIR_REQUEST = "pair.request"
@@ -39,7 +47,9 @@ object Protocol {
     }
 
     fun createMessage(type: String, body: Map<String, String> = emptyMap()): Message {
-        return Message(type = type, body = body)
+        // Convert String map to JsonElement map
+        val jsonBody = body.mapValues { (_, v) -> JsonPrimitive(v) }
+        return Message(type = type, body = jsonBody)
     }
 
     fun serialize(message: Message): String {

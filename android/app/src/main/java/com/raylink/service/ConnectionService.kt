@@ -26,8 +26,11 @@ class ConnectionService : Service() {
     private var connectedDeviceName: String? = null
     private var isPaired = false
 
-    // Suppress echo: when we receive clipboard from Mac, don't send it back
+    // Suppress echo: when we receive clipboard from Mac, don't send it back.
+    // Uses content + timestamp to avoid false suppression after the echo window.
     private var lastReceivedClipboard: String? = null
+    private var lastReceivedTime: Long = 0
+    private val echoWindowMs = 2000L // suppress echoes within 2 seconds of receiving
 
     override fun onCreate() {
         super.onCreate()
@@ -91,12 +94,14 @@ class ConnectionService : Service() {
         ClipboardAccessibilityService.onClipboardChanged = { content ->
             if (isPaired && wsClient.isConnected()) {
                 // Don't echo back clipboard content we just received from Mac
-                if (content != lastReceivedClipboard) {
+                // Only suppress within the echo window to avoid false suppression
+                val isEcho = content == lastReceivedClipboard &&
+                    (System.currentTimeMillis() - lastReceivedTime) < echoWindowMs
+                if (!isEcho) {
                     Log.d(TAG, "Sending clipboard to Mac: ${content.take(50)}...")
                     wsClient.sendClipboard(content)
                 } else {
                     Log.d(TAG, "Suppressing clipboard echo")
-                    lastReceivedClipboard = null
                 }
             }
         }
@@ -105,13 +110,13 @@ class ConnectionService : Service() {
     private fun handleMessage(message: Message) {
         when (message.type) {
             MessageType.PAIR_ACCEPT -> {
-                val deviceName = message.body["deviceName"] ?: "Mac"
-                val deviceId = message.body["deviceId"] ?: ""
+                val deviceName = message.bodyString("deviceName") ?: "Mac"
+                val deviceId = message.bodyString("deviceId") ?: ""
                 connectedDeviceName = deviceName
                 isPaired = true
 
                 // Save trusted device
-                val cert = message.body["certificate"] ?: ""
+                val cert = message.bodyString("certificate") ?: ""
                 if (cert.isNotEmpty()) {
                     certManager.saveTrustedDevice(deviceId, cert)
                 }
@@ -131,8 +136,9 @@ class ConnectionService : Service() {
 
             // Handle both clipboard.update and clipboard.connect
             MessageType.CLIPBOARD_UPDATE, MessageType.CLIPBOARD_CONNECT -> {
-                val content = message.body["content"] ?: return
+                val content = message.bodyString("content") ?: return
                 lastReceivedClipboard = content
+                lastReceivedTime = System.currentTimeMillis()
                 setDeviceClipboard(content)
                 Log.d(TAG, "Clipboard received from Mac: ${content.take(50)}...")
             }
@@ -145,8 +151,8 @@ class ConnectionService : Service() {
             }
 
             MessageType.FILE_OFFER -> {
-                val transferId = message.body["transferId"] ?: return
-                val fileName = message.body["fileName"] ?: "unknown"
+                val transferId = message.bodyString("transferId") ?: return
+                val fileName = message.bodyString("fileName") ?: "unknown"
                 Log.d(TAG, "Incoming file: $fileName")
                 wsClient.send(Protocol.createMessage(
                     MessageType.FILE_ACCEPT,
