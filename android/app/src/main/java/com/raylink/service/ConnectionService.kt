@@ -113,13 +113,12 @@ class ConnectionService : Service() {
     }
 
     private fun setupClipboardMonitoring() {
-        // Method 1: Accessibility Service (works in background on most devices)
+        // Method 1: Accessibility Service (works in background on some devices)
         ClipboardAccessibilityService.onClipboardChanged = { content ->
             trySendClipboard(content)
         }
 
         // Method 2: ClipboardManager listener (works when service has focus)
-        // This is a fallback for devices where accessibility events don't trigger
         scope.launch(Dispatchers.Main) {
             try {
                 val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -139,6 +138,36 @@ class ConnectionService : Service() {
                 Log.d(TAG, "ClipboardManager listener registered")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to register clipboard listener: ${e.message}")
+            }
+        }
+
+        // Method 3: Polling fallback — Samsung OneUI blocks background clipboard
+        // reads from accessibility services and clip listeners. Poll every 1s
+        // using the accessibility service context (which has clipboard read access).
+        scope.launch {
+            var lastPolledContent: String? = null
+            while (true) {
+                delay(1000)
+                if (!isPaired || !wsClient.isConnected()) continue
+                try {
+                    // Try reading from accessibility service context first (has elevated access)
+                    val a11y = ClipboardAccessibilityService.instance
+                    val clipManager = if (a11y != null) {
+                        a11y.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                    } else {
+                        getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                    }
+                    val clip = clipManager?.primaryClip
+                    if (clip != null && clip.itemCount > 0) {
+                        val content = clip.getItemAt(0).text?.toString()
+                        if (content != null && content != lastPolledContent) {
+                            lastPolledContent = content
+                            trySendClipboard(content)
+                        }
+                    }
+                } catch (_: Exception) {
+                    // Clipboard read failed — expected on some devices
+                }
             }
         }
     }
