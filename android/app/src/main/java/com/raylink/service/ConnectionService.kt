@@ -471,7 +471,7 @@ class ConnectionService : Service() {
         )
 
         return Notification.Builder(this, CHANNEL_ID)
-            .setContentTitle("RayLink")
+            .setContentTitle("Android Link")
             .setContentText(text)
             .setSmallIcon(android.R.drawable.stat_notify_sync)
             .setOngoing(true)

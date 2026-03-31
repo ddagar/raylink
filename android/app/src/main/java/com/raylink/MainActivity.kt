@@ -54,7 +54,7 @@ fun HomeScreen(
             Spacer(modifier = Modifier.height(48.dp))
 
             Text(
-                text = "RayLink",
+                text = "Android Link",
                 style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.Bold
             )
