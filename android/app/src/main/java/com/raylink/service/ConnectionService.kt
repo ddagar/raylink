@@ -497,6 +497,13 @@ class ConnectionService : Service() {
         var instance: ConnectionService? = null
             private set
 
+        /** Read-only accessors for UI to poll connection state */
+        val connectedDeviceName: String?
+            get() = instance?.connectedDeviceName
+
+        val isPairedStatus: Boolean
+            get() = instance?.isPaired == true
+
         fun start(context: Context) {
             val intent = Intent(context, ConnectionService::class.java)
             context.startForegroundService(intent)

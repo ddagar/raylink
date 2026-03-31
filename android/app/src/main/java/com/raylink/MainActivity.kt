@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.raylink.service.ConnectionService
+import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -38,7 +39,31 @@ fun HomeScreen(
     onStopService: () -> Unit,
     onOpenAccessibility: () -> Unit
 ) {
-    var serviceRunning by remember { mutableStateOf(false) }
+    var serviceRunning by remember { mutableStateOf(ConnectionService.instance != null) }
+    var connectedDevice by remember { mutableStateOf(ConnectionService.connectedDeviceName) }
+    var isPaired by remember { mutableStateOf(ConnectionService.isPairedStatus) }
+
+    // Poll connection state every second
+    LaunchedEffect(Unit) {
+        while (true) {
+            serviceRunning = ConnectionService.instance != null
+            connectedDevice = ConnectionService.connectedDeviceName
+            isPaired = ConnectionService.isPairedStatus
+            delay(1000)
+        }
+    }
+
+    val statusText = when {
+        !serviceRunning -> null
+        isPaired && connectedDevice != null -> "Connected to $connectedDevice"
+        serviceRunning -> "Searching for Mac on local network..."
+        else -> null
+    }
+
+    val statusColor = when {
+        isPaired -> MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -81,7 +106,7 @@ fun HomeScreen(
                         fontWeight = FontWeight.SemiBold
                     )
 
-                    Text("1. Start the RayLink daemon on your Mac")
+                    Text("1. Start the daemon on your Mac")
                     Text("2. Make sure both devices are on the same WiFi")
                     Text("3. Enable the Accessibility Service for clipboard sync")
                     Text("4. Start the connection service below")
@@ -106,7 +131,6 @@ fun HomeScreen(
                     } else {
                         onStartService()
                     }
-                    serviceRunning = !serviceRunning
                 },
                 modifier = Modifier.fillMaxWidth(),
                 colors = if (serviceRunning) {
@@ -118,11 +142,11 @@ fun HomeScreen(
                 Text(if (serviceRunning) "Stop Connection" else "Start Connection")
             }
 
-            if (serviceRunning) {
+            if (statusText != null) {
                 Text(
-                    text = "Searching for Mac on local network...",
+                    text = statusText,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.primary
+                    color = statusColor
                 )
             }
         }
