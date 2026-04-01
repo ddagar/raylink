@@ -456,9 +456,10 @@ class ConnectionService : Service() {
         val channel = NotificationChannel(
             CHANNEL_ID,
             getString(R.string.notification_channel_name),
-            NotificationManager.IMPORTANCE_LOW
+            NotificationManager.IMPORTANCE_DEFAULT
         ).apply {
             description = getString(R.string.notification_channel_description)
+            setShowBadge(false)
         }
         val manager = getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(channel)
@@ -524,7 +525,7 @@ class ConnectionService : Service() {
 
     companion object {
         private const val TAG = "ConnectionService"
-        private const val CHANNEL_ID = "raylink_connection"
+        private const val CHANNEL_ID = "android_link_status"
         private const val NOTIFICATION_ID = 1
         private const val ACTION_SEND_CLIPBOARD = "com.raylink.SEND_CLIPBOARD"
         private const val ACTION_DISCONNECT = "com.raylink.DISCONNECT"
