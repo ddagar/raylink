@@ -176,6 +176,10 @@ export class FileTransferManager {
     return this.transfers.get(id);
   }
 
+  updateSender(transferId: string, sender: (msg: Message) => void): void {
+    this.transferSenders.set(transferId, sender);
+  }
+
   getAllTransfers(): FileTransfer[] {
     return Array.from(this.transfers.values())
       .sort((a, b) => b.timestamp - a.timestamp)

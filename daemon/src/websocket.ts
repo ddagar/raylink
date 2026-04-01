@@ -167,6 +167,17 @@ export class WebSocketManager {
   }
 
   /** Send the current Mac clipboard to a newly connected device */
+  /** Close any existing connections for the same device ID (stale reconnects) */
+  private closeStaleConnections(deviceId: string, currentWs: WebSocket): void {
+    for (const [ws, dev] of this.connections) {
+      if (dev.id === deviceId && ws !== currentWs) {
+        console.log(`[ws] Closing stale connection for ${dev.name}`);
+        ws.close(1000, "Replaced by new connection");
+        this.connections.delete(ws);
+      }
+    }
+  }
+
   private sendClipboardConnect(send: (msg: Message) => void): void {
     this.clipboardMonitor.getClipboard()
       .then((content) => {
@@ -188,6 +199,9 @@ export class WebSocketManager {
         const body = msg.body as { deviceName: string; deviceId: string; certificate: string };
         device.id = body.deviceId;
         device.name = body.deviceName;
+
+        // Close any stale connections for this device
+        this.closeStaleConnections(body.deviceId, ws);
 
         // Set up per-connection sender and completion callback for this pairing
         this.pairingManager.setMessageSender(sendToThis);
@@ -283,7 +297,13 @@ export class WebSocketManager {
       case "file.accept": {
         if (!device.paired) return;
         const body = msg.body as { transferId: string };
-        this.fileTransferManager.handleFileAccept(body.transferId);
+        // Ensure the transfer has a valid sender for this connection
+        const transfer = this.fileTransferManager.getTransfer(String(body.transferId));
+        if (transfer && transfer.direction === "outgoing") {
+          // Update sender to use current connection (in case connection changed)
+          this.fileTransferManager.updateSender(String(body.transferId), sendToThis);
+        }
+        this.fileTransferManager.handleFileAccept(String(body.transferId));
         break;
       }
 
