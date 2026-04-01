@@ -112,13 +112,27 @@ async function main() {
   const discovery = new DiscoveryService(deviceId);
   discovery.advertise(WEBSOCKET_PORT);
 
-  const localIp = getLocalIp();
+  let lastIp = getLocalIp();
   console.log(`[daemon] RayLink daemon started`);
   console.log(`[daemon] Device: ${deviceName} (${deviceId.substring(0, 8)}...)`);
-  console.log(`[daemon] Local IP: ${localIp || "unknown"}`);
+  console.log(`[daemon] Local IP: ${lastIp || "unknown"}`);
   console.log(`[daemon] WebSocket: wss://0.0.0.0:${WEBSOCKET_PORT}`);
   console.log(`[daemon] API: http://127.0.0.1:${DAEMON_PORT}`);
   console.log(`[daemon] mDNS: _raylink._tcp`);
+
+  // 12. Monitor network changes — re-advertise mDNS when IP changes
+  setInterval(() => {
+    const currentIp = getLocalIp();
+    if (currentIp !== lastIp) {
+      console.log(`[daemon] Network changed: ${lastIp || "none"} → ${currentIp || "none"}`);
+      lastIp = currentIp;
+      discovery.stopAdvertising();
+      if (currentIp) {
+        discovery.advertise(WEBSOCKET_PORT);
+        console.log(`[daemon] Re-advertised mDNS on ${currentIp}`);
+      }
+    }
+  }, 5000);
 
   // Graceful shutdown
   const shutdown = () => {
