@@ -14,6 +14,7 @@ import android.os.Environment
 import android.os.IBinder
 import android.util.Base64
 import android.util.Log
+import com.raylink.MainActivity
 import com.raylink.R
 import com.raylink.network.*
 import kotlinx.coroutines.*
@@ -68,9 +69,12 @@ class ConnectionService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // Handle "Send Clipboard" action from notification
-        if (intent?.action == ACTION_SEND_CLIPBOARD) {
-            sendCurrentClipboard()
+        when (intent?.action) {
+            ACTION_SEND_CLIPBOARD -> sendCurrentClipboard()
+            ACTION_DISCONNECT -> {
+                stopSelf()
+                return START_NOT_STICKY
+            }
         }
         return START_STICKY
     }
@@ -461,23 +465,53 @@ class ConnectionService : Service() {
     }
 
     private fun createNotification(text: String): Notification {
-        // "Send Clipboard" action intent
+        // Tap notification → open app
+        val openAppIntent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+        val openAppPending = PendingIntent.getActivity(
+            this, 0, openAppIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        // "Send Clipboard" action
         val sendClipIntent = Intent(this, ConnectionService::class.java).apply {
             action = ACTION_SEND_CLIPBOARD
         }
         val sendClipPending = PendingIntent.getService(
-            this, 0, sendClipIntent,
+            this, 1, sendClipIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        // "Disconnect" action
+        val disconnectIntent = Intent(this, ConnectionService::class.java).apply {
+            action = ACTION_DISCONNECT
+        }
+        val disconnectPending = PendingIntent.getService(
+            this, 2, disconnectIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val title = if (isPaired && connectedDeviceName != null) {
+            "Connected to $connectedDeviceName"
+        } else {
+            "Android Link"
+        }
+
         return Notification.Builder(this, CHANNEL_ID)
-            .setContentTitle("Android Link")
+            .setContentTitle(title)
             .setContentText(text)
             .setSmallIcon(android.R.drawable.stat_notify_sync)
             .setOngoing(true)
+            .setContentIntent(openAppPending)
             .addAction(
                 Notification.Action.Builder(
                     null, "Send Clipboard", sendClipPending
+                ).build()
+            )
+            .addAction(
+                Notification.Action.Builder(
+                    null, "Disconnect", disconnectPending
                 ).build()
             )
             .build()
@@ -493,6 +527,7 @@ class ConnectionService : Service() {
         private const val CHANNEL_ID = "raylink_connection"
         private const val NOTIFICATION_ID = 1
         private const val ACTION_SEND_CLIPBOARD = "com.raylink.SEND_CLIPBOARD"
+        private const val ACTION_DISCONNECT = "com.raylink.DISCONNECT"
 
         var instance: ConnectionService? = null
             private set
