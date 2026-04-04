@@ -21,33 +21,38 @@ class ClipboardAccessibilityService : AccessibilityService() {
     private var lastCheckTime: Long = 0
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        // On Samsung OneUI, clipboard reads from accessibility services are denied
+        // ("not in focus"). We only use this as a best-effort check — the main
+        // clipboard detection is via ClipboardManager.OnPrimaryClipChangedListener
+        // in ConnectionService, which falls back to a transparent activity on Samsung.
         if (event == null) return
 
-        // Throttle: only check clipboard at most every 300ms
+        // Throttle: only check clipboard at most every 500ms
         val now = System.currentTimeMillis()
-        if (now - lastCheckTime < 300) return
+        if (now - lastCheckTime < 500) return
         lastCheckTime = now
 
         try {
             val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            val clip = clipboard.primaryClip
-            if (clip != null && clip.itemCount > 0) {
-                val content = clip.getItemAt(0).text?.toString() ?: return
-                if (content == lastClipContent) return
-                lastClipContent = content
+            val clip = clipboard.primaryClip ?: return
+            if (clip.itemCount == 0) return
+            val content = clip.getItemAt(0).text?.toString() ?: return
+            if (content == lastClipContent) return
+            lastClipContent = content
 
-                // Check if the clip is marked as sensitive (Android 13+)
-                if (android.os.Build.VERSION.SDK_INT >= 33) {
-                    val extras = clip.description.extras
-                    if (extras?.getBoolean("android.content.extra.IS_SENSITIVE", false) == true) {
-                        Log.d(TAG, "Skipping sensitive clipboard content")
-                        return
-                    }
+            // Check if the clip is marked as sensitive (Android 13+)
+            if (android.os.Build.VERSION.SDK_INT >= 33) {
+                val extras = clip.description.extras
+                if (extras?.getBoolean("android.content.extra.IS_SENSITIVE", false) == true) {
+                    Log.d(TAG, "Skipping sensitive clipboard content")
+                    return
                 }
-
-                Log.d(TAG, "Clipboard changed: ${content.take(50)}...")
-                onClipboardChanged?.invoke(content)
             }
+
+            Log.d(TAG, "Clipboard changed: ${content.take(50)}...")
+            onClipboardChanged?.invoke(content)
+        } catch (_: SecurityException) {
+            // Samsung OneUI denies clipboard access — expected, handled by ConnectionService
         } catch (e: Exception) {
             Log.e(TAG, "Error reading clipboard: ${e.message}")
         }

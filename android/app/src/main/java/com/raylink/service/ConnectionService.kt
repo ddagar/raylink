@@ -84,6 +84,7 @@ class ConnectionService : Service() {
     override fun onDestroy() {
         instance = null
         ClipboardAccessibilityService.onClipboardChanged = null
+        onClipboardReadFromActivity = null
         scope.cancel()
         wsClient.destroy()
         discovery.stopDiscovery()
@@ -122,57 +123,52 @@ class ConnectionService : Service() {
             trySendClipboard(content)
         }
 
-        // Method 2: ClipboardManager listener (works when service has focus)
+        // Callback from ClipboardReaderActivity (Samsung workaround)
+        onClipboardReadFromActivity = { content ->
+            trySendClipboard(content)
+        }
+
+        // Method 2: ClipboardManager listener — detects changes reliably even on Samsung.
+        // Samsung OneUI blocks clipboard reads from background services ("not in focus").
+        // When direct read fails, we launch a transparent activity that briefly gains focus
+        // to read the clipboard. Requires SYSTEM_ALERT_WINDOW permission.
         scope.launch(Dispatchers.Main) {
             try {
                 val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                 clipboard.addPrimaryClipChangedListener {
+                    // Try direct read first (works on stock Android and when app is in focus)
                     try {
                         val clip = clipboard.primaryClip
                         if (clip != null && clip.itemCount > 0) {
                             val content = clip.getItemAt(0).text?.toString()
                             if (content != null) {
                                 trySendClipboard(content)
+                                return@addPrimaryClipChangedListener
                             }
                         }
-                    } catch (e: Exception) {
-                        Log.d(TAG, "ClipChangedListener: ${e.message}")
-                    }
+                    } catch (_: Exception) { }
+                    // Samsung workaround: launch transparent activity to read clipboard
+                    launchClipboardReader()
                 }
                 Log.d(TAG, "ClipboardManager listener registered")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to register clipboard listener: ${e.message}")
             }
         }
+    }
 
-        // Method 3: Polling fallback — Samsung OneUI blocks background clipboard
-        // reads from accessibility services and clip listeners. Poll every 1s
-        // using the accessibility service context (which has clipboard read access).
-        scope.launch {
-            var lastPolledContent: String? = null
-            while (true) {
-                delay(1000)
-                if (!isPaired || !wsClient.isConnected()) continue
-                try {
-                    // Try reading from accessibility service context first (has elevated access)
-                    val a11y = ClipboardAccessibilityService.instance
-                    val clipManager = if (a11y != null) {
-                        a11y.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-                    } else {
-                        getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-                    }
-                    val clip = clipManager?.primaryClip
-                    if (clip != null && clip.itemCount > 0) {
-                        val content = clip.getItemAt(0).text?.toString()
-                        if (content != null && content != lastPolledContent) {
-                            lastPolledContent = content
-                            trySendClipboard(content)
-                        }
-                    }
-                } catch (_: Exception) {
-                    // Clipboard read failed — expected on some devices
-                }
-            }
+    /**
+     * Launch a transparent activity that briefly gains focus to read the clipboard.
+     * Required on Samsung OneUI which blocks clipboard access from background services.
+     */
+    private fun launchClipboardReader() {
+        if (!isPaired || !wsClient.isConnected()) return
+        try {
+            val intent = Intent(this, ClipboardReaderActivity::class.java)
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION)
+            startActivity(intent)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to launch clipboard reader: ${e.message}")
         }
     }
 
@@ -181,7 +177,10 @@ class ConnectionService : Service() {
      * Handles echo suppression and deduplication.
      */
     private fun trySendClipboard(content: String) {
-        if (!isPaired || !wsClient.isConnected()) return
+        if (!isPaired || !wsClient.isConnected()) {
+            Log.w(TAG, "trySendClipboard skipped: isPaired=$isPaired, isConnected=${wsClient.isConnected()}")
+            return
+        }
 
         // Don't echo back what we just received from Mac
         val isEcho = content == lastReceivedClipboard &&
@@ -192,7 +191,10 @@ class ConnectionService : Service() {
         }
 
         // Don't send duplicates
-        if (content == lastSentClipboard) return
+        if (content == lastSentClipboard) {
+            Log.d(TAG, "Suppressing duplicate clipboard: ${content.take(30)}...")
+            return
+        }
 
         lastSentClipboard = content
         Log.d(TAG, "Sending clipboard to Mac: ${content.take(50)}...")
@@ -532,6 +534,9 @@ class ConnectionService : Service() {
 
         var instance: ConnectionService? = null
             private set
+
+        /** Callback for ClipboardReaderActivity to deliver clipboard content */
+        var onClipboardReadFromActivity: ((String) -> Unit)? = null
 
         /** Read-only accessors for UI to poll connection state */
         val connectedDeviceName: String?

@@ -240,7 +240,10 @@ export class WebSocketManager {
       case "clipboard.connect":
       case "clipboard.update": {
         const body = msg.body as { content: string; contentType: "text" | "html" };
-        if (!device.paired) return;
+        if (!device.paired) {
+          console.warn(`[ws] Dropping clipboard from unpaired device ${device.name || "unknown"} (id: ${device.id || "none"})`);
+          return;
+        }
 
         console.log(`[ws] Clipboard from ${device.name}: ${body.content.substring(0, 50)}...`);
 
