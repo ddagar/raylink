@@ -52,7 +52,9 @@ class ClipboardAccessibilityService : AccessibilityService() {
             Log.d(TAG, "Clipboard changed: ${content.take(50)}...")
             onClipboardChanged?.invoke(content)
         } catch (_: SecurityException) {
-            // Samsung OneUI denies clipboard access — expected, handled by ConnectionService
+            // Samsung OneUI denies clipboard access — launch transparent activity to read
+            Log.d(TAG, "SecurityException reading clipboard, requesting activity fallback")
+            onClipboardReadFailed?.invoke()
         } catch (e: Exception) {
             Log.e(TAG, "Error reading clipboard: ${e.message}")
         }
@@ -80,5 +82,6 @@ class ClipboardAccessibilityService : AccessibilityService() {
             private set
 
         var onClipboardChanged: ((String) -> Unit)? = null
+        var onClipboardReadFailed: (() -> Unit)? = null
     }
 }

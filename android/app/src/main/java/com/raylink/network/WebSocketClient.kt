@@ -2,8 +2,9 @@ package com.raylink.network
 
 import android.util.Log
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.receiveAsFlow
 import okhttp3.*
 import java.util.concurrent.TimeUnit
 
@@ -15,8 +16,10 @@ class RayLinkWebSocketClient(
     private var client: OkHttpClient? = null
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
-    private val _messages = MutableSharedFlow<Message>(replay = 0, extraBufferCapacity = 64)
-    val messages: SharedFlow<Message> = _messages
+    // Messages are queued straight from OkHttp's reader thread, which delivers them one at a
+    // time, so the collector sees them in wire order. File chunks depend on that order.
+    private val incoming = Channel<Message>(Channel.UNLIMITED)
+    val messages: Flow<Message> = incoming.receiveAsFlow()
 
     var onConnected: (() -> Unit)? = null
     var onDisconnected: (() -> Unit)? = null
@@ -63,9 +66,7 @@ class RayLinkWebSocketClient(
 
             override fun onMessage(webSocket: WebSocket, text: String) {
                 val message = Protocol.parse(text) ?: return
-                scope.launch {
-                    _messages.emit(message)
-                }
+                incoming.trySend(message)
             }
 
             override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {

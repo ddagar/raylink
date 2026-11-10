@@ -18,7 +18,6 @@ import com.raylink.MainActivity
 import com.raylink.R
 import com.raylink.network.*
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.collectLatest
 import java.io.File
 import java.io.FileOutputStream
 
@@ -84,6 +83,7 @@ class ConnectionService : Service() {
     override fun onDestroy() {
         instance = null
         ClipboardAccessibilityService.onClipboardChanged = null
+        ClipboardAccessibilityService.onClipboardReadFailed = null
         onClipboardReadFromActivity = null
         scope.cancel()
         wsClient.destroy()
@@ -111,7 +111,7 @@ class ConnectionService : Service() {
         }
 
         scope.launch {
-            wsClient.messages.collectLatest { message ->
+            wsClient.messages.collect { message ->
                 handleMessage(message)
             }
         }
@@ -126,6 +126,11 @@ class ConnectionService : Service() {
         // Callback from ClipboardReaderActivity (Samsung workaround)
         onClipboardReadFromActivity = { content ->
             trySendClipboard(content)
+        }
+
+        // When accessibility service can't read clipboard (Samsung), launch transparent activity
+        ClipboardAccessibilityService.onClipboardReadFailed = {
+            launchClipboardReader()
         }
 
         // Method 2: ClipboardManager listener — detects changes reliably even on Samsung.
