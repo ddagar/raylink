@@ -31,7 +31,7 @@ class ShareReceiverActivity : ComponentActivity() {
     private fun handleSend(intent: Intent) {
         // Check for text content first — send as clipboard
         intent.getStringExtra(Intent.EXTRA_TEXT)?.let { text ->
-            Log.d(TAG, "Sharing text: ${text.take(50)}...")
+            Log.d(TAG, "Sharing text (${text.length} chars)")
             ConnectionService.sendClipboardFromShare(text)
             Toast.makeText(this, "Sent to Mac", Toast.LENGTH_SHORT).show()
             return

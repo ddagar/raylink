@@ -61,7 +61,8 @@ On the phone:
 1. Open RayLink and tap **Start Connection**. Both devices must be on the same Wi-Fi.
 2. Accept the pairing prompt on the Mac.
 3. Tap **Enable Accessibility Service** and turn RayLink on, so clipboard changes are detected in the background.
-4. On Samsung, also allow **Appear on top**: OneUI only lets a focused app read the clipboard, and RayLink briefly opens an invisible activity to do so.
+
+Android only lets the focused app read the clipboard, so when RayLink sees a copy (a tap on Copy/Cut, a "Copied" message) it briefly opens an invisible activity to read it. Copies made without such a signal, such as Ctrl+C on a hardware keyboard, are not detected; use **Send Clipboard** in the notification for those.
 
 Text copied on the phone is sent to the Mac; text from the Mac is placed on the phone's clipboard. Share any file or text to RayLink from the share sheet to send it to the Mac. Files from the Mac are saved to Downloads.
 

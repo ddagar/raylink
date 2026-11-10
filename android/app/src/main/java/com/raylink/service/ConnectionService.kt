@@ -83,7 +83,6 @@ class ConnectionService : Service() {
     override fun onDestroy() {
         instance = null
         ClipboardAccessibilityService.onClipboardChanged = null
-        ClipboardAccessibilityService.onClipboardReadFailed = null
         onClipboardReadFromActivity = null
         scope.cancel()
         wsClient.destroy()
@@ -128,15 +127,10 @@ class ConnectionService : Service() {
             trySendClipboard(content)
         }
 
-        // When accessibility service can't read clipboard (Samsung), launch transparent activity
-        ClipboardAccessibilityService.onClipboardReadFailed = {
-            launchClipboardReader()
-        }
-
         // Method 2: ClipboardManager listener — detects changes reliably even on Samsung.
         // Samsung OneUI blocks clipboard reads from background services ("not in focus").
-        // When direct read fails, we launch a transparent activity that briefly gains focus
-        // to read the clipboard. Requires SYSTEM_ALERT_WINDOW permission.
+        // When direct read fails, the accessibility service launches a transparent activity
+        // that briefly gains focus to read the clipboard.
         scope.launch(Dispatchers.Main) {
             try {
                 val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -163,18 +157,12 @@ class ConnectionService : Service() {
     }
 
     /**
-     * Launch a transparent activity that briefly gains focus to read the clipboard.
-     * Required on Samsung OneUI which blocks clipboard access from background services.
+     * Read the clipboard through the invisible reader activity. Only the accessibility
+     * service may start an activity while the app is in the background.
      */
     private fun launchClipboardReader() {
         if (!isPaired || !wsClient.isConnected()) return
-        try {
-            val intent = Intent(this, ClipboardReaderActivity::class.java)
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION)
-            startActivity(intent)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to launch clipboard reader: ${e.message}")
-        }
+        ClipboardAccessibilityService.instance?.launchReader()
     }
 
     /**
@@ -197,12 +185,12 @@ class ConnectionService : Service() {
 
         // Don't send duplicates
         if (content == lastSentClipboard) {
-            Log.d(TAG, "Suppressing duplicate clipboard: ${content.take(30)}...")
+            Log.d(TAG, "Suppressing duplicate clipboard")
             return
         }
 
         lastSentClipboard = content
-        Log.d(TAG, "Sending clipboard to Mac: ${content.take(50)}...")
+        Log.d(TAG, "Sending clipboard to Mac (${content.length} chars)")
         wsClient.sendClipboard(content)
     }
 
@@ -223,7 +211,7 @@ class ConnectionService : Service() {
                     if (content != null) {
                         lastSentClipboard = content
                         wsClient.sendClipboard(content)
-                        Log.d(TAG, "Sent clipboard from notification: ${content.take(50)}...")
+                        Log.d(TAG, "Sent clipboard from notification (${content.length} chars)")
                     }
                 }
             } catch (e: Exception) {
@@ -281,7 +269,7 @@ class ConnectionService : Service() {
                 lastReceivedClipboard = content
                 lastReceivedTime = System.currentTimeMillis()
                 setDeviceClipboard(content)
-                Log.d(TAG, "Clipboard received from Mac: ${content.take(50)}...")
+                Log.d(TAG, "Clipboard received from Mac (${content.length} chars)")
             }
 
             MessageType.CLIPBOARD_REQUEST -> {
@@ -399,6 +387,8 @@ class ConnectionService : Service() {
             try {
                 val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                 val clip = ClipData.newPlainText("RayLink", content)
+                // Setting the clipboard shows the system's "copied" feedback; that is not a user copy.
+                ClipboardAccessibilityService.ignoreCopySignals()
                 clipboard.setPrimaryClip(clip)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to set clipboard: ${e.message}")
