@@ -51,8 +51,8 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         monitor.start()
 
-        // ⌃⌘V
-        hotKey = HotKey(keyCode: kVK_ANSI_V, modifiers: controlKey | cmdKey) { [weak self] in
+        // ⇧⌘V
+        hotKey = HotKey(keyCode: kVK_ANSI_V, modifiers: shiftKey | cmdKey) { [weak self] in
             self?.panel.toggle()
         }
 
@@ -189,10 +189,10 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         let open = ActionItem("Clipboard History") { [weak self] in self?.panel.show() }
         open.keyEquivalent = "v"
-        open.keyEquivalentModifierMask = [.control, .command]
+        open.keyEquivalentModifierMask = [.shift, .command]
         menu.addItem(open)
         if hotKey?.isRegistered == false {
-            menu.addItem(disabled("⌃⌘V is taken by another app"))
+            menu.addItem(disabled("⇧⌘V is taken by another app"))
         }
         if let problem = store.storageError {
             menu.addItem(disabled(problem))

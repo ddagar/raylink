@@ -17,7 +17,7 @@ Needs macOS 15+ and the Xcode Command Line Tools (SwiftPM; no Xcode project).
 
 ### Clipboard history
 
-Open with **⌃⌘V**, or by launching the app again while it is running.
+Open with **⇧⌘V**, or by launching the app again while it is running.
 
 | Action | Keys |
 |---|---|
@@ -94,4 +94,4 @@ Every message is `{ id, type, timestamp, body }`. Android sends all body values 
 - The phone accepts any TLS certificate and is recognized by its device ID alone; there is no certificate pinning yet. Use it on networks you trust.
 - The Android app buffers incoming and outgoing files in memory, and can reorder incoming chunks, so large files from the Mac may arrive corrupted.
 - Only text is synced between clipboards; images and files in the history stay on the Mac unless sent explicitly.
-- The history hotkey is fixed at ⌃⌘V.
+- The history hotkey is fixed at ⇧⌘V. It is system-wide, so it replaces "Paste and Match Style" in apps that use that shortcut.
