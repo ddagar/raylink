@@ -45,7 +45,13 @@ Pasting into the active app needs the Accessibility permission; without it the e
 - Files shared to RayLink on the phone land in `~/Downloads` and in the history.
 - Menu bar: send the clipboard, pull the phone's clipboard, send files, unpair.
 
-Data lives in `~/Library/Application Support/RayLink/`: `history.json`, `images/`, and `identity/` (TLS certificate, key, paired devices).
+Data lives in `~/Library/Application Support/RayLink/`:
+
+- `history.sqlite` — one row per entry, each sealed with AES-256-GCM. Only the entry ID, last-copied time and pinned flag are stored in the clear.
+- `images/` — copied images, encrypted with the same key and named by content hash.
+- `identity/` — TLS certificate, key, paired devices.
+
+The encryption key is kept in the login Keychain ("RayLink clipboard history key"), not on disk. Because the app is ad-hoc signed, macOS asks for permission to use the key after each rebuild; if access is denied, history is kept in memory only and the menu says so.
 
 ## Android app
 

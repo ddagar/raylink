@@ -90,15 +90,13 @@ final class PasteboardMonitor {
                 store.touch(existing.id)
                 return
             }
-            let name = UUID().uuidString + ".png"
-            let url = store.imagesDir.appendingPathComponent(name)
-            guard (try? png.write(to: url, options: .atomic)) != nil else { return }
+            guard let name = store.saveImage(png, hash: hash) else { return }
             var item = ClipItem(kind: .image, text: "", hash: hash)
             item.imageFile = name
             item.imageWidth = rep.pixelsWide
             item.imageHeight = rep.pixelsHigh
             let saved = store.add(stamp(item))
-            recognizeText(at: url) { [weak store] text in
+            recognizeText(in: png) { [weak store] text in
                 if !text.isEmpty { store?.setOCR(saved.id, text: text) }
             }
         }
@@ -113,7 +111,7 @@ final class PasteboardMonitor {
         pb.clearContents()
         switch item.kind {
         case .image:
-            if let url = store.imageURL(for: item), let data = try? Data(contentsOf: url) {
+            if let data = store.imageData(for: item) {
                 pb.setData(data, forType: .png)
                 if let tiff = NSImage(data: data)?.tiffRepresentation { pb.setData(tiff, forType: .tiff) }
             }
@@ -150,12 +148,12 @@ final class PasteboardMonitor {
 }
 
 /// On-device OCR so copied images are searchable by their text.
-private func recognizeText(at url: URL, completion: @escaping (String) -> Void) {
+private func recognizeText(in image: Data, completion: @escaping (String) -> Void) {
     DispatchQueue.global(qos: .utility).async {
         let request = VNRecognizeTextRequest()
         request.recognitionLevel = .accurate
         request.automaticallyDetectsLanguage = true
-        try? VNImageRequestHandler(url: url).perform([request])
+        try? VNImageRequestHandler(data: image).perform([request])
         let text = (request.results ?? [])
             .compactMap { $0.topCandidates(1).first?.string }
             .joined(separator: "\n")

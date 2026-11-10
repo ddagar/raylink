@@ -160,6 +160,9 @@ enum Paths {
         try? fm.moveItem(at: legacy, to: identityDir)
     }
 
+    /// Where an isolated test run keeps its history key instead of the Keychain.
+    static var testKeyFile: URL? { override?.appendingPathComponent("data/history.key") }
+
     static var dataDir: URL {
         override?.appendingPathComponent("data")
             ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]

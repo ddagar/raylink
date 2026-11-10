@@ -72,7 +72,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        store?.saveNow()
+        store?.close()
     }
 
     private func startServer() {
@@ -193,6 +193,9 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(open)
         if hotKey?.isRegistered == false {
             menu.addItem(disabled("⌃⌘V is taken by another app"))
+        }
+        if let problem = store.storageError {
+            menu.addItem(disabled(problem))
         }
         menu.addItem(.separator())
 

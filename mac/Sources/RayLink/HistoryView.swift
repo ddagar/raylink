@@ -1,14 +1,16 @@
 import AppKit
 import SwiftUI
 
+/// Decrypted images, kept in memory only while the app runs.
 private final class ThumbnailCache {
     static let shared = ThumbnailCache()
-    private let cache = NSCache<NSURL, NSImage>()
+    private let cache = NSCache<NSString, NSImage>()
 
-    func image(_ url: URL) -> NSImage? {
-        if let hit = cache.object(forKey: url as NSURL) { return hit }
-        guard let image = NSImage(contentsOf: url) else { return nil }
-        cache.setObject(image, forKey: url as NSURL)
+    func image(for item: ClipItem, in store: HistoryStore) -> NSImage? {
+        guard let name = item.imageFile else { return nil }
+        if let hit = cache.object(forKey: name as NSString) { return hit }
+        guard let data = store.imageData(for: item), let image = NSImage(data: data) else { return nil }
+        cache.setObject(image, forKey: name as NSString)
         return image
     }
 }
@@ -246,7 +248,7 @@ private struct RowView: View {
     @ViewBuilder private var icon: some View {
         switch item.kind {
         case .image:
-            if let url = store.imageURL(for: item), let image = ThumbnailCache.shared.image(url) {
+            if let image = ThumbnailCache.shared.image(for: item, in: store) {
                 Image(nsImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
@@ -310,7 +312,7 @@ private struct DetailView: View {
     @ViewBuilder private var preview: some View {
         switch item.kind {
         case .image:
-            if let url = store.imageURL(for: item), let image = ThumbnailCache.shared.image(url) {
+            if let image = ThumbnailCache.shared.image(for: item, in: store) {
                 Image(nsImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fit)

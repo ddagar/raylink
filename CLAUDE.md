@@ -11,9 +11,9 @@ Two components communicate over local WiFi:
 ```bash
 cd mac && ./build.sh && open build/RayLink.app
 ```
-Needs only the Xcode Command Line Tools (SwiftPM, no Xcode project). History window: ⌃⌘V. Data is stored in `~/Library/Application Support/RayLink/` (`history.json`, `images/`, `identity/`).
+Needs only the Xcode Command Line Tools (SwiftPM, no Xcode project). History window: ⌃⌘V. Data is stored in `~/Library/Application Support/RayLink/`: `history.sqlite` (rows sealed with AES-256-GCM, key in the login Keychain), encrypted `images/`, and `identity/`.
 
-For an isolated run that does not touch real data, start the binary with `RAYLINK_HOME=<dir>`; add `RAYLINK_HEADLESS=1` to suppress the pairing dialog.
+For an isolated run that does not touch real data, start the binary with `RAYLINK_HOME=<dir>`; add `RAYLINK_HEADLESS=1` to suppress the pairing dialog. Such runs keep the history key in a file in that directory and never touch the Keychain.
 
 ### Android App
 ```bash
