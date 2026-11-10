@@ -1,10 +1,9 @@
-node_modules/
-dist/
 .DS_Store
 *.log
 
-# Daemon data
-.raycast-android/
+# Mac app
+mac/.build/
+mac/build/
 
 # Android
 android/.gradle/
@@ -14,6 +13,3 @@ android/local.properties
 android/.idea/
 android/*.iml
 android/app/*.iml
-
-# Raycast
-.raycast-dev/

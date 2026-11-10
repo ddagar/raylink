@@ -1,39 +1,39 @@
-# RayLink — Android-Mac Clipboard Sync & File Transfer
+# RayLink — Mac clipboard history with Android clipboard sync & file transfer
 
 ## Architecture
-Three components communicate over local WiFi:
-- **Raycast Extension** (`src/`) — TypeScript/React UI layer
-- **Node.js Daemon** (`daemon/`) — persistent background service, handles networking
-- **Android Companion App** (`android/`) — Kotlin/Jetpack Compose
+Two components communicate over local WiFi:
+- **Mac App** (`mac/`) — Swift menu-bar app (AppKit + SwiftUI): clipboard history window, plus the WebSocket/TLS server and mDNS advertising built in
+- **Android Companion App** (`android/`) — Kotlin/Jetpack Compose; discovers the Mac and connects as a client
 
 ## Build & Run
 
-### Daemon
+### Mac App
 ```bash
-cd daemon && npm install && npm run build && node dist/index.js
+cd mac && ./build.sh && open build/RayLink.app
 ```
-For development with auto-reload: `npm run dev`
+Needs only the Xcode Command Line Tools (SwiftPM, no Xcode project). History window: ⌃⌘V. Data is stored in `~/Library/Application Support/RayLink/` (`history.json`, `images/`, `identity/`).
 
-### Raycast Extension
-```bash
-npm install && npm run dev
-```
+For an isolated run that does not touch real data, start the binary with `RAYLINK_HOME=<dir>`; add `RAYLINK_HEADLESS=1` to suppress the pairing dialog.
 
 ### Android App
-Open `android/` in Android Studio and build.
+```bash
+cd android && JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew installDebug
+```
+There is no system JDK; use the one bundled with Android Studio.
 
 ## Protocol
 - Discovery: mDNS `_raylink._tcp` on port 18734
 - Communication: JSON messages over WebSocket/TLS
-- Message types defined in `daemon/src/protocol.ts` and `android/.../Protocol.kt`
-- **Important**: Android sends all body values as strings; daemon must handle both string and native types (use explicit coercion, not type assertions)
+- Message handling lives in `mac/Sources/RayLink/LinkServer.swift` and `android/.../Protocol.kt`
+- **Important**: Android sends all body values as strings; the Mac must handle both string and native types (use explicit coercion, not casts)
 
 ## Key Design Decisions
-- Local network only (no cloud relay) — privacy-first, sub-ms latency
-- Daemon is the WebSocket server; Android is the client
-- Clipboard polling on Mac via `pbpaste` (500ms), Accessibility Service on Android
-- Files chunked at 64KB for WebSocket, streamed for files >10MB
-- Self-signed TLS certificates with certificate pinning after pairing
+- Local network only (no cloud relay) — privacy-first
+- The Mac is the WebSocket server; Android is the client
+- Mac clipboard watched via `NSPasteboard.changeCount` polling (0.4s); Accessibility Service plus a transparent activity on Android (Samsung OneUI only lets a focused app read the clipboard)
+- Only the Mac ever sends `pair.accept`; an unpaired connection can do nothing but request pairing
+- Files are chunked at 64KB; the Mac streams to and from disk, and sanitizes incoming file names
+- Self-signed TLS certificate; Android does not pin it yet and is identified by device ID only
 
 ## Testing
-Start daemon, verify with: `curl http://127.0.0.1:19876/status`
+No test suite. The Mac server can be exercised with any WebSocket client against `wss://127.0.0.1:18734` (self-signed certificate) speaking the protocol above.

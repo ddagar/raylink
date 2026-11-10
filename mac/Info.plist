@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>com.raylink.mac</string>
+    <key>CFBundleName</key>
+    <string>RayLink</string>
+    <key>CFBundleDisplayName</key>
+    <string>RayLink</string>
+    <key>CFBundleExecutable</key>
+    <string>RayLink</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>0.1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>15.0</string>
+    <key>LSUIElement</key>
+    <true/>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>RayLink syncs the clipboard and transfers files with your paired Android phone over the local network.</string>
+    <key>NSBonjourServices</key>
+    <array>
+        <string>_raylink._tcp</string>
+    </array>
+</dict>
+</plist>

@@ -125,7 +125,7 @@ fun HomeScreen(
                         fontWeight = FontWeight.SemiBold
                     )
 
-                    Text("1. Start the daemon on your Mac")
+                    Text("1. Open RayLink on your Mac")
                     Text("2. Make sure both devices are on the same WiFi")
                     Text("3. Enable the Accessibility Service for clipboard sync")
                     Text("4. Start the connection service below")
